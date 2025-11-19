@@ -24,6 +24,23 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'ogrenci-takip-sistemi-secret-key-2024')
 CORS(app)
 
+# Veritabanını başlat (Gunicorn için)
+# Gunicorn ile çalışırken if __name__ == '__main__' çalışmaz
+# Bu yüzden app oluşturulurken init_db() çağrılmalı
+try:
+    print("🔄 Veritabanı başlatılıyor...")
+    init_db()
+    print("✅ Veritabanı hazır.")
+    if USE_SUPABASE:
+        print("📁 Veritabanı: Supabase PostgreSQL")
+    else:
+        print("📁 Veritabanı: SQLite (Local)")
+except Exception as e:
+    print(f"⚠️  Veritabanı başlatma uyarısı: {e}")
+    import traceback
+    traceback.print_exc()
+    # Hata olsa bile devam et (belki tablolar zaten var)
+
 # Production error handler
 @app.errorhandler(500)
 def internal_error(error):
