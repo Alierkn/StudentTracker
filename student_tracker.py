@@ -24,6 +24,33 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'ogrenci-takip-sistemi-secret-key-2024')
 CORS(app)
 
+# Google OAuth client (lazy initialization)
+_google_oauth = None
+
+def get_google_oauth():
+    """Google OAuth client'ı al veya oluştur"""
+    global _google_oauth
+    if _google_oauth is None:
+        try:
+            from authlib.integrations.flask_client import OAuth
+            GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+            GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+            
+            if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+                oauth = OAuth(app)
+                _google_oauth = oauth.register(
+                    name='google',
+                    client_id=GOOGLE_CLIENT_ID,
+                    client_secret=GOOGLE_CLIENT_SECRET,
+                    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+                    client_kwargs={
+                        'scope': 'openid email profile'
+                    }
+                )
+        except ImportError:
+            pass
+    return _google_oauth
+
 # Veritabanını başlat (Gunicorn için)
 # Gunicorn ile çalışırken if __name__ == '__main__' çalışmaz
 # Bu yüzden app oluşturulurken init_db() çağrılmalı
@@ -176,28 +203,11 @@ def logout():
 def google_login():
     """Google OAuth ile giriş/kayıt"""
     try:
-        from authlib.integrations.flask_client import OAuth
-        import requests
+        google = get_google_oauth()
         
-        # Google OAuth credentials
-        GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
-        GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
-        
-        if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-            flash('Google OAuth yapılandırılmamış. Lütfen yöneticiye başvurun.', 'error')
-            return redirect(url_for('login'))
-        
-        # OAuth client oluştur
-        oauth = OAuth(app)
-        google = oauth.register(
-            name='google',
-            client_id=GOOGLE_CLIENT_ID,
-            client_secret=GOOGLE_CLIENT_SECRET,
-            server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-            client_kwargs={
-                'scope': 'openid email profile'
-            }
-        )
+        if not google:
+            flash('Google OAuth yapılandırılmamış. Lütfen normal kayıt formunu kullanın.', 'info')
+            return redirect(url_for('register'))
         
         # Redirect URI
         redirect_uri = url_for('google_callback', _external=True)
@@ -205,22 +215,24 @@ def google_login():
         # Google'a yönlendir
         return google.authorize_redirect(redirect_uri)
         
-    except ImportError:
-        flash('Google OAuth kütüphanesi yüklü değil. Lütfen yöneticiye başvurun.', 'error')
-        return redirect(url_for('register'))
     except Exception as e:
-        flash(f'Google girişi sırasında hata oluştu: {str(e)}', 'error')
+        import traceback
+        print(f"Google login hatası: {e}")
+        print(traceback.format_exc())
+        flash('Google girişi şu anda kullanılamıyor. Lütfen normal kayıt formunu kullanın.', 'error')
         return redirect(url_for('register'))
 
 @app.route('/google-callback')
 def google_callback():
     """Google OAuth callback"""
     try:
-        from authlib.integrations.flask_client import OAuth
         from werkzeug.security import generate_password_hash
         
-        oauth = OAuth(app)
-        google = oauth.google
+        google = get_google_oauth()
+        
+        if not google:
+            flash('Google OAuth yapılandırılmamış.', 'error')
+            return redirect(url_for('register'))
         
         # Token al
         token = google.authorize_access_token()
@@ -245,9 +257,9 @@ def google_callback():
         with get_db() as conn:
             c = get_cursor(conn)
             
-            # Kullanıcı var mı kontrol et (email veya username ile)
-            query = adapt_query('SELECT * FROM students WHERE email = ? OR username = ?')
-            c.execute(query, (email, username))
+            # Kullanıcı var mı kontrol et (email ile)
+            query = adapt_query('SELECT * FROM students WHERE email = ?')
+            c.execute(query, (email,))
             user = c.fetchone()
             
             if user:
