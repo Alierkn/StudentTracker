@@ -322,9 +322,13 @@ body {
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-radius: 24px;
     padding: 3rem;
+    padding-bottom: 2.5rem;
     box-shadow: var(--shadow-xl);
     border: 1px solid rgba(255, 255, 255, 0.3);
     animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    min-height: auto;
+    max-height: 95vh;
+    overflow-y: auto;
 }
 
 .auth-header {
@@ -377,11 +381,33 @@ body {
 
 .auth-form {
     margin-top: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+.auth-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 1.5rem 0;
+    color: var(--gray);
+    font-size: 0.9rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--border);
+}
+
+.auth-divider span {
+    padding: 0 1rem;
 }
 
 .auth-footer {
     text-align: center;
     margin-top: 2rem;
+    padding-top: 1.5rem;
     color: var(--gray);
     font-size: 0.95rem;
 }
@@ -506,6 +532,28 @@ body {
 .btn-secondary:hover {
     background: var(--light);
     transform: translateY(-2px);
+}
+
+.btn-google {
+    background: white;
+    color: var(--dark);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    font-weight: 600;
+}
+
+.btn-google:hover {
+    background: #f8f9fa;
+    border-color: #dadce0;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-google svg {
+    flex-shrink: 0;
 }
 
 .btn-block {

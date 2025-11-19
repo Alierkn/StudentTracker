@@ -172,6 +172,137 @@ def logout():
     flash('Başarıyla çıkış yapıldı.', 'success')
     return redirect(url_for('login'))
 
+@app.route('/google-login')
+def google_login():
+    """Google OAuth ile giriş/kayıt"""
+    try:
+        from authlib.integrations.flask_client import OAuth
+        import requests
+        
+        # Google OAuth credentials
+        GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+        GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+        
+        if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+            flash('Google OAuth yapılandırılmamış. Lütfen yöneticiye başvurun.', 'error')
+            return redirect(url_for('login'))
+        
+        # OAuth client oluştur
+        oauth = OAuth(app)
+        google = oauth.register(
+            name='google',
+            client_id=GOOGLE_CLIENT_ID,
+            client_secret=GOOGLE_CLIENT_SECRET,
+            server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+            client_kwargs={
+                'scope': 'openid email profile'
+            }
+        )
+        
+        # Redirect URI
+        redirect_uri = url_for('google_callback', _external=True)
+        
+        # Google'a yönlendir
+        return google.authorize_redirect(redirect_uri)
+        
+    except ImportError:
+        flash('Google OAuth kütüphanesi yüklü değil. Lütfen yöneticiye başvurun.', 'error')
+        return redirect(url_for('register'))
+    except Exception as e:
+        flash(f'Google girişi sırasında hata oluştu: {str(e)}', 'error')
+        return redirect(url_for('register'))
+
+@app.route('/google-callback')
+def google_callback():
+    """Google OAuth callback"""
+    try:
+        from authlib.integrations.flask_client import OAuth
+        from werkzeug.security import generate_password_hash
+        
+        oauth = OAuth(app)
+        google = oauth.google
+        
+        # Token al
+        token = google.authorize_access_token()
+        
+        # Kullanıcı bilgilerini al
+        user_info = token.get('userinfo')
+        if not user_info:
+            resp = google.get('userinfo')
+            user_info = resp.json()
+        
+        email = user_info.get('email')
+        name = user_info.get('name', '')
+        google_id = user_info.get('sub')
+        
+        if not email:
+            flash('Google hesabınızdan e-posta bilgisi alınamadı.', 'error')
+            return redirect(url_for('register'))
+        
+        # Kullanıcı adı oluştur (email'den)
+        username = email.split('@')[0]
+        
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Kullanıcı var mı kontrol et (email veya username ile)
+            query = adapt_query('SELECT * FROM students WHERE email = ? OR username = ?')
+            c.execute(query, (email, username))
+            user = c.fetchone()
+            
+            if user:
+                # Mevcut kullanıcı - giriş yap
+                session['user_id'] = user['id']
+                session['username'] = user['username']
+                session['full_name'] = user['full_name']
+                session['is_admin'] = bool(user['is_admin'])
+                flash(f'Hoş geldiniz, {user["full_name"]}!', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                # Yeni kullanıcı - kayıt ol
+                # Username benzersiz olmalı
+                base_username = username
+                counter = 1
+                while True:
+                    query = adapt_query('SELECT id FROM students WHERE username = ?')
+                    c.execute(query, (username,))
+                    if not c.fetchone():
+                        break
+                    username = f"{base_username}{counter}"
+                    counter += 1
+                
+                # Rastgele şifre oluştur (Google OAuth kullanıcıları için)
+                import secrets
+                random_password = secrets.token_urlsafe(32)
+                hashed_password = generate_password_hash(random_password)
+                
+                # Kullanıcıyı ekle
+                query = adapt_query('''
+                    INSERT INTO students (username, password, full_name, email)
+                    VALUES (?, ?, ?, ?)
+                ''')
+                c.execute(query, (username, hashed_password, name, email))
+                conn.commit()
+                
+                # Yeni oluşturulan kullanıcıyı al
+                query = adapt_query('SELECT * FROM students WHERE username = ?')
+                c.execute(query, (username,))
+                new_user = c.fetchone()
+                
+                session['user_id'] = new_user['id']
+                session['username'] = new_user['username']
+                session['full_name'] = new_user['full_name']
+                session['is_admin'] = bool(new_user['is_admin'])
+                flash(f'Hoş geldiniz, {name}! Google hesabınızla kayıt oldunuz.', 'success')
+                return redirect(url_for('dashboard'))
+                
+    except Exception as e:
+        import traceback
+        print(f"Google OAuth hatası: {e}")
+        print(traceback.format_exc())
+        flash(f'Google girişi sırasında hata oluştu: {str(e)}', 'error')
+        return redirect(url_for('register'))
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
