@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - EducationalTR Öğrenci Takip Sistemi{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="dashboard-header">
+        <h1>Hoş Geldiniz, {{ session.full_name }}! 👋</h1>
+        <p class="subtitle">Çalışma istatistikleriniz ve gelişiminiz</p>
+    </div>
+
+    <!-- İstatistik Kartları -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">📖</div>
+            <div class="stat-content">
+                <h3>{{ stats.total_sessions or 0 }}</h3>
+                <p>Toplam Çalışma</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">⏰</div>
+            <div class="stat-content">
+                <h3>{{ "%.1f"|format(stats.total_hours or 0) }}</h3>
+                <p>Toplam Saat</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">⭐</div>
+            <div class="stat-content">
+                <h3>{{ "%.0f"|format(stats.avg_efficiency or 0) }}%</h3>
+                <p>Ortalama Verimlilik</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">📅</div>
+            <div class="stat-content">
+                <h3>{{ stats.study_days or 0 }}</h3>
+                <p>Çalışma Günü</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">📊</div>
+            <div class="stat-content">
+                <h3>{{ "%.1f"|format(avg_percentage) }}%</h3>
+                <p>Sınav Ortalaması</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grafikler -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Günlük Çalışma Saatleri (Son 30 Gün)</h2>
+            <canvas id="dailyHoursChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <h2>Ders Bazında Çalışma</h2>
+            <canvas id="subjectChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <h2>Verimlilik Trendi</h2>
+            <canvas id="efficiencyChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Ortalama Hesaplayıcı -->
+    <div class="calculator-card">
+        <h2>🎯 Ortalama Hesaplayıcı</h2>
+        <p>Hedef ortalamaya ulaşmak için gerekli notları hesaplayın</p>
+        <div class="calculator-form">
+            <div class="form-group">
+                <label>Hedef Ortalama (0-100)</label>
+                <input type="number" id="targetAvg" min="0" max="100" step="0.1" placeholder="Örn: 85">
+            </div>
+            <div class="form-group">
+                <label>Kalan Sınav Sayısı</label>
+                <input type="number" id="remainingExams" min="1" value="1">
+            </div>
+            <button onclick="calculateGrade()" class="btn btn-primary">Hesapla</button>
+        </div>
+        <div id="gradeResult" class="grade-result"></div>
+    </div>
+
+    <!-- Son Çalışma Kayıtları -->
+    <div class="recent-section">
+        <h2>Son Çalışma Kayıtları</h2>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Tarih</th>
+                        <th>Ders</th>
+                        <th>Saat</th>
+                        <th>Verimlilik</th>
+                        <th>Notlar</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if recent_sessions %}
+                        {% for session in recent_sessions %}
+                        <tr>
+                            <td>{{ session.date }}</td>
+                            <td>{{ session.subject }}</td>
+                            <td>{{ "%.1f"|format(session.hours) }} saat</td>
+                            <td>
+                                <span class="efficiency-badge efficiency-{{ 'high' if session.efficiency >= 70 else 'medium' if session.efficiency >= 50 else 'low' }}">
+                                    {{ session.efficiency }}%
+                                </span>
+                            </td>
+                            <td>{{ session.notes[:50] if session.notes else '-' }}{{ '...' if session.notes and session.notes|length > 50 else '' }}</td>
+                            <td>
+                                <button onclick="deleteStudySession({{ session.id }})" class="btn-delete" title="Sil">
+                                    🗑️
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="empty-state">Henüz çalışma kaydı eklenmemiş</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Sınav Sonuçları -->
+    <div class="recent-section">
+        <h2>Sınav Sonuçları</h2>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Sınav Adı</th>
+                        <th>Not</th>
+                        <th>Maksimum</th>
+                        <th>Yüzde</th>
+                        <th>Tarih</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if exams %}
+                        {% for exam in exams %}
+                        <tr>
+                            <td>{{ exam.exam_name }}</td>
+                            <td>{{ "%.1f"|format(exam.score) }}</td>
+                            <td>{{ "%.1f"|format(exam.max_score) }}</td>
+                            <td>
+                                <span class="grade-badge grade-{{ 'excellent' if (exam.score * 100 / exam.max_score) >= 90 else 'good' if (exam.score * 100 / exam.max_score) >= 70 else 'average' if (exam.score * 100 / exam.max_score) >= 50 else 'poor' }}">
+                                    {{ "%.1f"|format(exam.score * 100 / exam.max_score) }}%
+                                </span>
+                            </td>
+                            <td>{{ exam.exam_date or '-' }}</td>
+                            <td>
+                                <button onclick="deleteExam({{ exam.id }})" class="btn-delete" title="Sil">
+                                    🗑️
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="empty-state">Henüz sınav sonucu eklenmemiş</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Grafikleri yükle
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            // Günlük saatler grafiği
+            const dailyCtx = document.getElementById('dailyHoursChart').getContext('2d');
+            new Chart(dailyCtx, {
+                type: 'line',
+                data: {
+                    labels: data.daily_hours.map(d => d.date),
+                    datasets: [{
+                        label: 'Çalışma Saatleri',
+                        data: data.daily_hours.map(d => d.hours),
+                        borderColor: 'rgb(99, 102, 241)',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // Ders bazında grafik
+            const subjectCtx = document.getElementById('subjectChart').getContext('2d');
+            new Chart(subjectCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.subject_hours.map(s => s.subject),
+                    datasets: [{
+                        data: data.subject_hours.map(s => s.hours),
+                        backgroundColor: [
+                            'rgba(99, 102, 241, 0.8)',
+                            'rgba(139, 92, 246, 0.8)',
+                            'rgba(236, 72, 153, 0.8)',
+                            'rgba(251, 146, 60, 0.8)',
+                            'rgba(34, 197, 94, 0.8)',
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            // Verimlilik trendi (günlük)
+            if (data.efficiency_trend && data.efficiency_trend.length > 0) {
+                const efficiencyCtx = document.getElementById('efficiencyChart').getContext('2d');
+                new Chart(efficiencyCtx, {
+                    type: 'line',
+                    data: {
+                        labels: data.efficiency_trend.map(e => {
+                            // SQLite date formatı: YYYY-MM-DD
+                            if (e.date) {
+                                const dateParts = e.date.split('-');
+                                if (dateParts.length === 3) {
+                                    const date = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+                                    return date.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
+                                }
+                            }
+                            return e.date || '';
+                        }),
+                        datasets: [{
+                            label: 'Verimlilik (%)',
+                            data: data.efficiency_trend.map(e => parseFloat(e.efficiency) || 0),
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            borderColor: 'rgba(34, 197, 94, 1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            pointBackgroundColor: 'rgba(34, 197, 94, 1)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                // Veri yoksa mesaj göster
+                const efficiencyCtx = document.getElementById('efficiencyChart');
+                if (efficiencyCtx) {
+                    efficiencyCtx.parentElement.innerHTML = '<p style="text-align: center; padding: 2rem; color: var(--gray);">Henüz verimlilik verisi yok. Çalışma kaydı ekledikçe grafik oluşacak.</p>';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Grafik yükleme hatası:', error);
+            const efficiencyCtx = document.getElementById('efficiencyChart');
+            if (efficiencyCtx) {
+                efficiencyCtx.parentElement.innerHTML = '<p style="text-align: center; padding: 2rem; color: var(--gray);">Grafik yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.</p>';
+            }
+        });
+
+    function calculateGrade() {
+        const targetAvg = parseFloat(document.getElementById('targetAvg').value);
+        const remainingExams = parseInt(document.getElementById('remainingExams').value);
+        const resultDiv = document.getElementById('gradeResult');
+
+        if (!targetAvg || targetAvg <= 0 || targetAvg > 100) {
+            resultDiv.innerHTML = '<div class="alert alert-error">Lütfen geçerli bir hedef ortalama girin (0-100)</div>';
+            return;
+        }
+
+        fetch('/calculate-grade', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                target_avg: targetAvg,
+                remaining_exams: remainingExams
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <h3>📊 Hesaplama Sonucu</h3>
+                        <p><strong>Mevcut Ortalama:</strong> ${data.current_avg}%</p>
+                        <p><strong>Hedef Ortalama:</strong> ${data.target_avg}%</p>
+                        <p><strong>Kalan Sınav Sayısı:</strong> ${data.remaining_exams}</p>
+                        <p class="result-highlight">🎯 <strong>Gerekli Ortalama:</strong> ${data.needed_avg_per_exam}%</p>
+                        <p>${data.message}</p>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `<div class="alert alert-error">${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            console.error('Hesaplama hatası:', error);
+            resultDiv.innerHTML = `<div class="alert alert-error">Bir hata oluştu: ${error.message}</div>`;
+        });
+    }
+
+    // Çalışma kaydı sil
+    function deleteStudySession(id) {
+        if (confirm('Bu çalışma kaydını silmek istediğinize emin misiniz?')) {
+            fetch('/delete-study/' + id, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Silme işlemi başarısız: ' + (data.error || 'Bilinmeyen hata'));
+                }
+            })
+            .catch(error => {
+                console.error('Silme hatası:', error);
+                alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+            });
+        }
+    }
+
+    // Sınav sonucu sil
+    function deleteExam(id) {
+        if (confirm('Bu sınav sonucunu silmek istediğinize emin misiniz?')) {
+            fetch('/delete-exam/' + id, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Silme işlemi başarısız: ' + (data.error || 'Bilinmeyen hata'));
+                }
+            })
+            .catch(error => {
+                console.error('Silme hatası:', error);
+                alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+            });
+        }
+    }
+</script>
+{% endblock %}
+

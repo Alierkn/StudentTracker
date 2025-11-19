@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}{{ student.full_name }} - Detay - EducationalTR{% endblock %}
+
+{% block content %}
+<div class="student-detail-page">
+    <div class="detail-header">
+        <a href="{{ url_for('admin_dashboard') }}" class="back-link">← Geri</a>
+        <h1>{{ student.full_name }}</h1>
+        <p class="subtitle">@{{ student.username }} - {{ student.email or 'E-posta yok' }}</p>
+    </div>
+
+    <div class="detail-sections">
+        <!-- Çalışma Kayıtları -->
+        <div class="detail-section">
+            <h2>📖 Çalışma Kayıtları</h2>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tarih</th>
+                            <th>Ders</th>
+                            <th>Saat</th>
+                            <th>Verimlilik</th>
+                            <th>Notlar</th>
+                            <th>Zorluklar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if sessions %}
+                            {% for session in sessions %}
+                            <tr>
+                                <td>{{ session.date }}</td>
+                                <td>{{ session.subject }}</td>
+                                <td>{{ "%.1f"|format(session.hours) }} saat</td>
+                                <td>
+                                    <span class="efficiency-badge efficiency-{{ 'high' if session.efficiency >= 70 else 'medium' if session.efficiency >= 50 else 'low' }}">
+                                        {{ session.efficiency }}%
+                                    </span>
+                                </td>
+                                <td>{{ session.notes[:50] if session.notes else '-' }}{{ '...' if session.notes and session.notes|length > 50 else '' }}</td>
+                                <td>{{ session.difficulties[:50] if session.difficulties else '-' }}{{ '...' if session.difficulties and session.difficulties|length > 50 else '' }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="empty-state">Henüz çalışma kaydı yok</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Sınav Sonuçları -->
+        <div class="detail-section">
+            <h2>📝 Sınav Sonuçları</h2>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Sınav Adı</th>
+                            <th>Not</th>
+                            <th>Maksimum</th>
+                            <th>Yüzde</th>
+                            <th>Tarih</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if exams %}
+                            {% for exam in exams %}
+                            <tr>
+                                <td>{{ exam.exam_name }}</td>
+                                <td>{{ "%.1f"|format(exam.score) }}</td>
+                                <td>{{ "%.1f"|format(exam.max_score) }}</td>
+                                <td>
+                                    <span class="grade-badge grade-{{ 'excellent' if (exam.score * 100 / exam.max_score) >= 90 else 'good' if (exam.score * 100 / exam.max_score) >= 70 else 'average' if (exam.score * 100 / exam.max_score) >= 50 else 'poor' }}">
+                                        {{ "%.1f"|format(exam.score * 100 / exam.max_score) }}%
+                                    </span>
+                                </td>
+                                <td>{{ exam.exam_date or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="empty-state">Henüz sınav sonucu yok</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

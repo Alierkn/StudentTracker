@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - EducationalTR{% endblock %}
+
+{% block content %}
+<div class="admin-dashboard">
+    <div class="dashboard-header">
+        <h1>👨‍💼 Admin Paneli</h1>
+        <p class="subtitle">Tüm öğrencilerin çalışma verilerini görüntüleyin</p>
+    </div>
+
+    <div class="students-grid">
+        {% for item in student_stats %}
+        <div class="student-card">
+            <div class="student-header">
+                <h3>{{ item.student.full_name }}</h3>
+                <span class="student-username">@{{ item.student.username }}</span>
+            </div>
+            <div class="student-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Toplam Çalışma:</span>
+                    <span class="stat-value">{{ item.stats.total_sessions or 0 }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Toplam Saat:</span>
+                    <span class="stat-value">{{ "%.1f"|format(item.stats.total_hours or 0) }} saat</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Ortalama Verimlilik:</span>
+                    <span class="stat-value">{{ "%.0f"|format(item.stats.avg_efficiency or 0) }}%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Çalışma Günü:</span>
+                    <span class="stat-value">{{ item.stats.study_days or 0 }} gün</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Sınav Ortalaması:</span>
+                    <span class="stat-value">{{ "%.1f"|format(item.exam_avg) }}%</span>
+                </div>
+            </div>
+            <div class="student-actions">
+                <a href="{{ url_for('admin_student_detail', student_id=item.student.id) }}" class="btn btn-primary btn-sm">Detayları Gör</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not student_stats %}
+    <div class="empty-state">
+        <p>Henüz kayıtlı öğrenci yok.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

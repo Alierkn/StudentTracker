@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Sınav Ekle - EducationalTR{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <div class="form-card">
+        <div class="form-header">
+            <h1>📝 Yeni Sınav Sonucu Ekle</h1>
+            <p>Sınav sonuçlarınızı kaydedin ve ortalamanızı takip edin</p>
+        </div>
+
+        <form method="POST" class="exam-form">
+            <div class="form-group">
+                <label for="exam_name">Sınav Adı *</label>
+                <input type="text" id="exam_name" name="exam_name" placeholder="Örn: Matematik Vize 1, Fizik Final..." required>
+            </div>
+
+            <div class="form-group">
+                <label for="score">Aldığınız Not *</label>
+                <input type="number" id="score" name="score" min="0" step="0.1" placeholder="Örn: 85" required>
+            </div>
+
+            <div class="form-group">
+                <label for="max_score">Maksimum Not</label>
+                <input type="number" id="max_score" name="max_score" min="1" value="100" step="0.1" placeholder="100">
+                <small>Varsayılan: 100</small>
+            </div>
+
+            <div class="form-group">
+                <label for="exam_date">Sınav Tarihi</label>
+                <input type="date" id="exam_date" name="exam_date" value="{{ request.form.exam_date or '' }}">
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">İptal</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Çalışma Ekle - EducationalTR{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <div class="form-card">
+        <div class="form-header">
+            <h1>📖 Yeni Çalışma Kaydı Ekle</h1>
+            <p>Günlük çalışma verilerinizi kaydedin</p>
+        </div>
+
+        <form method="POST" class="study-form" id="studyForm" onsubmit="return showConfirmationPopup(event)">
+            <div class="form-group">
+                <label for="date">Tarih *</label>
+                <input type="date" id="date" name="date" value="{{ request.form.date or '' }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="subject">Ders/Konu *</label>
+                <input type="text" id="subject" name="subject" placeholder="Örn: Matematik, Fizik, Kimya..." required>
+            </div>
+
+            <div class="form-group">
+                <label for="hours">Çalışma Süresi (Saat) *</label>
+                <input type="number" id="hours" name="hours" min="0.1" max="24" step="0.1" placeholder="Örn: 2.5" required>
+                <small>Örn: 2.5 saat için 2.5 yazın</small>
+            </div>
+
+            <div class="form-group">
+                <label for="efficiency">Verimlilik (%) *</label>
+                <input type="range" id="efficiency" name="efficiency" min="0" max="100" value="50" oninput="updateEfficiencyValue(this.value)">
+                <div class="range-display">
+                    <span id="efficiencyValue">50</span>%
+                </div>
+                <small>Çalışmanızın ne kadar verimli olduğunu değerlendirin</small>
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notlar (Opsiyonel)</label>
+                <textarea id="notes" name="notes" rows="4" placeholder="Çalıştığınız konular, önemli noktalar..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="difficulties">Anlamadığınız Yerler (Opsiyonel)</label>
+                <textarea id="difficulties" name="difficulties" rows="3" placeholder="Anlamadığınız veya zorlandığınız konular..."></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">İptal</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Komik Pop-up Modal -->
+<div id="confirmationModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="modal-icon">🤔</span>
+            <h2>Yalan Söylemiyorsun Değil Mi?</h2>
+        </div>
+        <div class="modal-body">
+            <p>Girdiğin veriler doğru mu? Gerçekten bu kadar çalıştın mı? 😏</p>
+            <div class="modal-stats">
+                <div class="modal-stat-item">
+                    <span class="modal-stat-label">Ders:</span>
+                    <span class="modal-stat-value" id="previewSubject">-</span>
+                </div>
+                <div class="modal-stat-item">
+                    <span class="modal-stat-label">Süre:</span>
+                    <span class="modal-stat-value" id="previewHours">-</span>
+                </div>
+                <div class="modal-stat-item">
+                    <span class="modal-stat-label">Verimlilik:</span>
+                    <span class="modal-stat-value" id="previewEfficiency">-</span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-success" onclick="confirmSubmit()">
+                ✅ Söylemiyorum Hocam!
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                🔄 Ben Bi Tekrar Gözden Geçirmek İstiyorum
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Sayfa yüklendiğinde
+    document.addEventListener('DOMContentLoaded', function() {
+        // Bugünün tarihini varsayılan olarak ayarla
+        const dateInput = document.getElementById('date');
+        if (dateInput && !dateInput.value) {
+            const today = new Date();
+            dateInput.valueAsDate = today;
+        }
+
+        // Modal dışına tıklanınca kapat
+        const modal = document.getElementById('confirmationModal');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeModal();
+                }
+            });
+        }
+    });
+
+    function updateEfficiencyValue(value) {
+        const display = document.getElementById('efficiencyValue');
+        if (display) {
+            display.textContent = value;
+        }
+    }
+
+    // Pop-up göster
+    function showConfirmationPopup(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        // Form verilerini al
+        const subject = document.getElementById('subject').value;
+        const hours = document.getElementById('hours').value;
+        const efficiency = document.getElementById('efficiency').value;
+        
+        // Önizleme göster
+        const previewSubject = document.getElementById('previewSubject');
+        const previewHours = document.getElementById('previewHours');
+        const previewEfficiency = document.getElementById('previewEfficiency');
+        
+        if (previewSubject) previewSubject.textContent = subject || '-';
+        if (previewHours) previewHours.textContent = hours ? hours + ' saat' : '-';
+        if (previewEfficiency) previewEfficiency.textContent = efficiency ? efficiency + '%' : '-';
+        
+        // Modal'ı göster
+        const modal = document.getElementById('confirmationModal');
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+        
+        return false;
+    }
+
+    // Onayla ve gönder
+    function confirmSubmit() {
+        const form = document.getElementById('studyForm');
+        if (form) {
+            // Modal'ı kapat
+            closeModal();
+            // Formu gönder
+            form.submit();
+        }
+    }
+
+    // Modal'ı kapat
+    function closeModal() {
+        const modal = document.getElementById('confirmationModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}
+

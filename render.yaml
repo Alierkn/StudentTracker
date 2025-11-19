@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: educationaltr-student-tracker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn student_tracker:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PORT
+        value: 5002
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+
