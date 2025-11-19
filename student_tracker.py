@@ -24,6 +24,34 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'ogrenci-takip-sistemi-secret-key-2024')
 CORS(app)
 
+# Production error handler
+@app.errorhandler(500)
+def internal_error(error):
+    """500 hatası için detaylı log"""
+    import traceback
+    error_msg = traceback.format_exc()
+    print("=" * 60)
+    print("❌ INTERNAL SERVER ERROR")
+    print("=" * 60)
+    print(error_msg)
+    print("=" * 60)
+    # Production'da detaylı hata gösterme
+    if os.environ.get('FLASK_DEBUG', 'False').lower() == 'true':
+        return f"<h1>Internal Server Error</h1><pre>{error_msg}</pre>", 500
+    return "Internal Server Error", 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Tüm exception'ları yakala"""
+    import traceback
+    error_msg = traceback.format_exc()
+    print("=" * 60)
+    print("❌ UNHANDLED EXCEPTION")
+    print("=" * 60)
+    print(error_msg)
+    print("=" * 60)
+    return "Internal Server Error", 500
+
 def login_required(f):
     """Giriş yapmış kullanıcı kontrolü"""
     @wraps(f)
@@ -534,21 +562,29 @@ def admin_student_detail(student_id):
     return render_template('admin_student_detail.html', student=student, sessions=sessions, exams=exams)
 
 if __name__ == '__main__':
-    # Veritabanını başlat
-    init_db()
-    
-    port = int(os.environ.get('PORT', 5002))
-    debug = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'  # Debug modunu aç
-    
-    print("=" * 60)
-    print("📚 Öğrenci Çalışma Takip Sistemi - EducationalTR")
-    print("=" * 60)
-    print(f"🌐 Uygulama başlatılıyor: http://0.0.0.0:{port}")
-    if USE_SUPABASE:
-        print("📁 Veritabanı: Supabase PostgreSQL")
-    else:
-        print("📁 Veritabanı: SQLite (Local)")
-    print("=" * 60)
-    
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    try:
+        # Veritabanını başlat
+        print("🔄 Veritabanı başlatılıyor...")
+        init_db()
+        print("✅ Veritabanı hazır.")
+        
+        port = int(os.environ.get('PORT', 5002))
+        debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+        
+        print("=" * 60)
+        print("📚 Öğrenci Çalışma Takip Sistemi - EducationalTR")
+        print("=" * 60)
+        print(f"🌐 Uygulama başlatılıyor: http://0.0.0.0:{port}")
+        if USE_SUPABASE:
+            print("📁 Veritabanı: Supabase PostgreSQL")
+        else:
+            print("📁 Veritabanı: SQLite (Local)")
+        print("=" * 60)
+        
+        app.run(debug=debug, host='0.0.0.0', port=port)
+    except Exception as e:
+        print(f"❌ Uygulama başlatılırken hata: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
