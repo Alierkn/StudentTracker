@@ -58,3 +58,6 @@ Uygulamanız canlıda! Render size bir URL verecek (örn: `https://your-app.onre
 
 **Not:** Netlify Flask uygulamalarını desteklemez. Render, Railway veya Fly.io kullanın.
 
+
+
+

@@ -104,3 +104,6 @@ Veya manuel olarak Supabase SQL Editor'dan oluşturabilirsiniz:
 - Supabase SQL Editor'dan manuel oluşturun
 - Veya uygulamayı bir kez çalıştırın (otomatik oluşturur)
 
+
+
+

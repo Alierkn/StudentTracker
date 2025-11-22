@@ -140,3 +140,6 @@ Deploy edildikten sonra, uygulama ilk çalıştığında otomatik olarak tablola
 **Geliştirici:** EducationalTR  
 **Versiyon:** 2.0 (Supabase Edition)
 
+
+
+

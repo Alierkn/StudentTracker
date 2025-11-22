@@ -64,3 +64,6 @@ source venv/bin/activate
 python migrate_to_supabase.py
 ```
 
+
+
+

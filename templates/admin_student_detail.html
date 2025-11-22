@@ -8,6 +8,9 @@
         <a href="{{ url_for('admin_dashboard') }}" class="back-link">← Geri</a>
         <h1>{{ student.full_name }}</h1>
         <p class="subtitle">@{{ student.username }} - {{ student.email or 'E-posta yok' }}</p>
+        <div class="detail-actions">
+            <a href="{{ url_for('admin_view_schedule', student_id=student.id) }}" class="btn btn-primary">📅 Ders Programını Görüntüle</a>
+        </div>
     </div>
 
     <div class="detail-sections">

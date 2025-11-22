@@ -89,3 +89,6 @@ if USE_SUPABASE:
 - Özel karakterler varsa URL encoding gerekebilir
 - Connection pooling genellikle daha güvenilirdir
 
+
+
+

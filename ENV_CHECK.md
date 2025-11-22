@@ -57,3 +57,6 @@ Deploy sonrası siteyi açın. Artık çalışmalı!
 3. Deploy'u yeniden başlatın
 4. Log'ları paylaşın
 
+
+
+

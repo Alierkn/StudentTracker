@@ -127,10 +127,56 @@ def init_db():
                 )
             ''')
             
+            # Ders programları tablosu
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS schedules (
+                    id SERIAL PRIMARY KEY,
+                    student_id INTEGER NOT NULL,
+                    name VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # Ders programı öğeleri tablosu
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS schedule_items (
+                    id SERIAL PRIMARY KEY,
+                    schedule_id INTEGER NOT NULL,
+                    day_of_week INTEGER NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6),
+                    start_time TIME NOT NULL,
+                    end_time TIME NOT NULL,
+                    subject VARCHAR(255) NOT NULL,
+                    location VARCHAR(255),
+                    instructor VARCHAR(255),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (schedule_id) REFERENCES schedules (id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # Ders programı tamamlama durumları tablosu
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS schedule_completions (
+                    id SERIAL PRIMARY KEY,
+                    schedule_item_id INTEGER NOT NULL,
+                    completion_date DATE NOT NULL,
+                    is_completed BOOLEAN DEFAULT FALSE,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (schedule_item_id) REFERENCES schedule_items (id) ON DELETE CASCADE
+                )
+            ''')
+            
             # Index'ler
             cur.execute('CREATE INDEX IF NOT EXISTS idx_study_sessions_student_id ON study_sessions(student_id)')
             cur.execute('CREATE INDEX IF NOT EXISTS idx_study_sessions_date ON study_sessions(date)')
             cur.execute('CREATE INDEX IF NOT EXISTS idx_exam_results_student_id ON exam_results(student_id)')
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_schedules_student_id ON schedules(student_id)')
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_schedule_items_schedule_id ON schedule_items(schedule_id)')
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_schedule_completions_item_id ON schedule_completions(schedule_item_id)')
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_schedule_completions_date ON schedule_completions(completion_date)')
             
             conn.commit()
             
@@ -184,6 +230,54 @@ def init_db():
                 FOREIGN KEY (student_id) REFERENCES students (id)
             )
         ''')
+        
+        # Ders programları tablosu
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS schedules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_id) REFERENCES students (id)
+            )
+        ''')
+        
+        # Ders programı öğeleri tablosu
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS schedule_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                schedule_id INTEGER NOT NULL,
+                day_of_week INTEGER NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6),
+                start_time TIME NOT NULL,
+                end_time TIME NOT NULL,
+                subject TEXT NOT NULL,
+                location TEXT,
+                instructor TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (schedule_id) REFERENCES schedules (id)
+            )
+        ''')
+        
+        # Ders programı tamamlama durumları tablosu
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS schedule_completions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                schedule_item_id INTEGER NOT NULL,
+                completion_date DATE NOT NULL,
+                is_completed INTEGER DEFAULT 0,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (schedule_item_id) REFERENCES schedule_items (id)
+            )
+        ''')
+        
+        # Index'ler
+        c.execute('CREATE INDEX IF NOT EXISTS idx_schedules_student_id ON schedules(student_id)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_schedule_items_schedule_id ON schedule_items(schedule_id)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_schedule_completions_item_id ON schedule_completions(schedule_item_id)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_schedule_completions_date ON schedule_completions(completion_date)')
         
         conn.commit()
         conn.close()

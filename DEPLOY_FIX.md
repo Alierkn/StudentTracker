@@ -49,3 +49,6 @@ python-3.12.7
 
 Deploy'u tekrar deneyin!
 
+
+
+

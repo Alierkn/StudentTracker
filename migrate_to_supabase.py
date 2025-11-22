@@ -169,6 +169,129 @@ def migrate_data():
             
             supabase_conn.commit()
             print(f"✅ {migrated_exams} sınav sonucu aktarıldı.")
+            
+            # 4. Schedules tablosunu aktar
+            print("\n📅 Schedules tablosu aktarılıyor...")
+            sqlite_cur.execute('SELECT * FROM schedules')
+            schedules = sqlite_cur.fetchall()
+            
+            schedule_id_map = {}
+            migrated_schedules = 0
+            for schedule in schedules:
+                try:
+                    old_student_id = schedule['student_id']
+                    new_student_id = student_id_map.get(old_student_id)
+                    
+                    if not new_student_id:
+                        print(f"  ⚠️  Student ID {old_student_id} bulunamadı, atlanıyor...")
+                        continue
+                    
+                    query = adapt_query('''
+                        INSERT INTO schedules (student_id, name, description, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''')
+                    supabase_cur.execute(query, (
+                        new_student_id,
+                        schedule['name'],
+                        schedule.get('description', ''),
+                        schedule.get('created_at', None),
+                        schedule.get('updated_at', None)
+                    ))
+                    
+                    # ID mapping oluştur
+                    if USE_SUPABASE:
+                        supabase_cur.execute('SELECT LASTVAL()')
+                    else:
+                        supabase_cur.execute('SELECT last_insert_rowid()')
+                    new_schedule_id = supabase_cur.fetchone()[0]
+                    schedule_id_map[schedule['id']] = new_schedule_id
+                    migrated_schedules += 1
+                except Exception as e:
+                    print(f"  ❌ Schedule aktarılırken hata: {e}")
+            
+            supabase_conn.commit()
+            print(f"✅ {migrated_schedules} ders programı aktarıldı.")
+            
+            # 5. Schedule Items tablosunu aktar
+            print("\n📋 Schedule Items tablosu aktarılıyor...")
+            sqlite_cur.execute('SELECT * FROM schedule_items')
+            items = sqlite_cur.fetchall()
+            
+            item_id_map = {}
+            migrated_items = 0
+            for item in items:
+                try:
+                    old_schedule_id = item['schedule_id']
+                    new_schedule_id = schedule_id_map.get(old_schedule_id)
+                    
+                    if not new_schedule_id:
+                        print(f"  ⚠️  Schedule ID {old_schedule_id} bulunamadı, atlanıyor...")
+                        continue
+                    
+                    query = adapt_query('''
+                        INSERT INTO schedule_items (schedule_id, day_of_week, start_time, end_time, subject, location, instructor, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ''')
+                    supabase_cur.execute(query, (
+                        new_schedule_id,
+                        item['day_of_week'],
+                        item['start_time'],
+                        item['end_time'],
+                        item['subject'],
+                        item.get('location', ''),
+                        item.get('instructor', ''),
+                        item.get('created_at', None)
+                    ))
+                    
+                    # ID mapping oluştur
+                    if USE_SUPABASE:
+                        supabase_cur.execute('SELECT LASTVAL()')
+                    else:
+                        supabase_cur.execute('SELECT last_insert_rowid()')
+                    new_item_id = supabase_cur.fetchone()[0]
+                    item_id_map[item['id']] = new_item_id
+                    migrated_items += 1
+                except Exception as e:
+                    print(f"  ❌ Schedule Item aktarılırken hata: {e}")
+            
+            supabase_conn.commit()
+            print(f"✅ {migrated_items} ders programı öğesi aktarıldı.")
+            
+            # 6. Schedule Completions tablosunu aktar
+            print("\n✅ Schedule Completions tablosu aktarılıyor...")
+            sqlite_cur.execute('SELECT * FROM schedule_completions')
+            completions = sqlite_cur.fetchall()
+            
+            migrated_completions = 0
+            for completion in completions:
+                try:
+                    old_item_id = completion['schedule_item_id']
+                    new_item_id = item_id_map.get(old_item_id)
+                    
+                    if not new_item_id:
+                        print(f"  ⚠️  Item ID {old_item_id} bulunamadı, atlanıyor...")
+                        continue
+                    
+                    # SQLite boolean dönüşümü
+                    is_completed = bool(completion['is_completed']) if USE_SUPABASE else completion['is_completed']
+                    
+                    query = adapt_query('''
+                        INSERT INTO schedule_completions (schedule_item_id, completion_date, is_completed, notes, created_at)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''')
+                    supabase_cur.execute(query, (
+                        new_item_id,
+                        completion['completion_date'],
+                        is_completed,
+                        completion.get('notes', ''),
+                        completion.get('created_at', None)
+                    ))
+                    migrated_completions += 1
+                except Exception as e:
+                    print(f"  ❌ Completion aktarılırken hata: {e}")
+            
+            supabase_conn.commit()
+            print(f"✅ {migrated_completions} tamamlama kaydı aktarıldı.")
         
         print("\n" + "=" * 60)
         print("✅ VERİ AKTARIMI TAMAMLANDI!")
@@ -177,6 +300,9 @@ def migrate_data():
         print(f"   - Öğrenciler: {migrated_students}")
         print(f"   - Çalışma Kayıtları: {migrated_sessions}")
         print(f"   - Sınav Sonuçları: {migrated_exams}")
+        print(f"   - Ders Programları: {migrated_schedules}")
+        print(f"   - Ders Programı Öğeleri: {migrated_items}")
+        print(f"   - Tamamlama Kayıtları: {migrated_completions}")
         print("=" * 60)
         
         return True

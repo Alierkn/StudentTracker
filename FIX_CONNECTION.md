@@ -110,3 +110,6 @@ Connection string'i düzelttikten sonra migration script'ini çalıştırın:
 python migrate_to_supabase.py
 ```
 
+
+
+

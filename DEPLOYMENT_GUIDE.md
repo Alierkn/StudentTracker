@@ -122,3 +122,6 @@ git push -u origin main
 - `DEPLOY.md` - Detaylı deploy bilgileri
 - `QUICK_START.md` - Hızlı başlangıç
 
+
+
+

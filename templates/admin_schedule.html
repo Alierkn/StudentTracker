@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Öğrenci Ders Programı - Admin - EducationalTR{% endblock %}
+
+{% block content %}
+<div class="admin-schedule-container">
+    <div class="admin-schedule-header">
+        <h1>📅 {{ student.full_name }} - Ders Programı</h1>
+        <p class="subtitle">Öğrenci: {{ student.username }}</p>
+        <a href="{{ url_for('admin_student_detail', student_id=student.id) }}" class="btn btn-secondary">← Öğrenci Detayına Dön</a>
+    </div>
+
+    {% if active_schedule %}
+    <div class="schedule-info-card">
+        <h2>{{ active_schedule.name }}</h2>
+        {% if active_schedule.description %}
+        <p>{{ active_schedule.description }}</p>
+        {% endif %}
+        <p class="schedule-meta">
+            <span>Oluşturulma: {{ active_schedule.created_at }}</span>
+            {% if active_schedule.updated_at != active_schedule.created_at %}
+            <span> | Güncellenme: {{ active_schedule.updated_at }}</span>
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="schedule-week">
+        {% set days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'] %}
+        {% for day_num in range(7) %}
+        <div class="schedule-day">
+            <div class="day-header">
+                <h3>{{ days[day_num] }}</h3>
+            </div>
+            <div class="day-items">
+                {% for item in schedule_items %}
+                {% if item.day_of_week == day_num %}
+                <div class="schedule-item admin-item">
+                    <div class="item-time">
+                        <span class="time-start">{{ item.start_time }}</span>
+                        <span class="time-separator">-</span>
+                        <span class="time-end">{{ item.end_time }}</span>
+                    </div>
+                    <div class="item-content">
+                        <h4 class="item-subject">{{ item.subject }}</h4>
+                        {% if item.location %}
+                        <p class="item-location">📍 {{ item.location }}</p>
+                        {% endif %}
+                        {% if item.instructor %}
+                        <p class="item-instructor">👤 {{ item.instructor }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="item-completion-status">
+                        {% if completions.get(item.id) %}
+                        {% set today_completion = completions[item.id]|selectattr('completion_date', 'equalto', today)|list|first %}
+                        {% if today_completion and today_completion.is_completed %}
+                        <span class="completion-badge completed">✓ Tamamlandı</span>
+                        {% else %}
+                        <span class="completion-badge pending">⏳ Beklemede</span>
+                        {% endif %}
+                        <div class="completion-history">
+                            <strong>Tamamlama Geçmişi:</strong>
+                            <ul>
+                                {% for completion in completions[item.id][:5] %}
+                                <li>
+                                    {{ completion.completion_date }}: 
+                                    {% if completion.is_completed %}
+                                    <span class="status-completed">✓ Tamamlandı</span>
+                                    {% else %}
+                                    <span class="status-pending">⏳ Beklemede</span>
+                                    {% endif %}
+                                    {% if completion.notes %}
+                                    - {{ completion.notes }}
+                                    {% endif %}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% else %}
+                        <span class="completion-badge not-started">○ Henüz başlanmadı</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-schedule">
+        <div class="empty-icon">📅</div>
+        <h2>Bu öğrencinin henüz ders programı yok</h2>
+        <p>Öğrenci henüz ders programı oluşturmamış</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+

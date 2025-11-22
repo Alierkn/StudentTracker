@@ -115,3 +115,6 @@ Başarılı olursa şu mesajı görmelisiniz:
 - Uygulamayı bir kez çalıştırın (otomatik oluşturur)
 - Veya Supabase SQL Editor'dan manuel oluşturun
 
+
+
+

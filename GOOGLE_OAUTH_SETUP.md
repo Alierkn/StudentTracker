@@ -88,3 +88,6 @@ GOOGLE_CLIENT_SECRET=your-client-secret-here
 - Normal kullanıcı adı/şifre ile kayıt olma devam eder
 - Google OAuth opsiyonel bir özelliktir
 
+
+
+

@@ -27,3 +27,6 @@ def get_date_function(days=0):
             return "date('now')"
         return f"date('now', '-{days} days')"
 
+
+
+

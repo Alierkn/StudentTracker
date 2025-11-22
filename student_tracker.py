@@ -721,6 +721,430 @@ def admin_student_detail(student_id):
     
     return render_template('admin_student_detail.html', student=student, sessions=sessions, exams=exams)
 
+# DERS PROGRAMI ROUTE'LARI
+
+@app.route('/schedule')
+@login_required
+def schedule():
+    """Öğrenci ders programı sayfası"""
+    student_id = session['user_id']
+    
+    with get_db() as conn:
+        c = get_cursor(conn)
+        
+        # Öğrencinin ders programlarını al
+        query = adapt_query('''
+            SELECT * FROM schedules
+            WHERE student_id = ?
+            ORDER BY created_at DESC
+        ''')
+        c.execute(query, (student_id,))
+        schedules = c.fetchall()
+        
+        # Aktif program varsa onu al
+        active_schedule = None
+        schedule_items = []
+        completions = {}
+        
+        if schedules:
+            active_schedule = schedules[0]  # En son oluşturulan program
+            
+            # Program öğelerini al
+            query = adapt_query('''
+                SELECT * FROM schedule_items
+                WHERE schedule_id = ?
+                ORDER BY day_of_week, start_time
+            ''')
+            c.execute(query, (active_schedule['id'],))
+            schedule_items = c.fetchall()
+            
+            # Tamamlama durumlarını al (bugün ve geçmiş)
+            from datetime import date
+            today_date = date.today()
+            
+            for item in schedule_items:
+                query = adapt_query('''
+                    SELECT * FROM schedule_completions
+                    WHERE schedule_item_id = ? AND completion_date <= ?
+                    ORDER BY completion_date DESC
+                ''')
+                c.execute(query, (item['id'], today_date))
+                item_completions = c.fetchall()
+                # SQLite için boolean dönüşümü
+                processed_completions = []
+                for comp in item_completions:
+                    comp_dict = dict(comp)
+                    if not USE_SUPABASE:
+                        comp_dict['is_completed'] = bool(comp_dict['is_completed'])
+                    processed_completions.append(comp_dict)
+                completions[item['id']] = processed_completions
+    
+    from datetime import date
+    today = str(date.today())
+    
+    return render_template('schedule.html', 
+                         schedules=schedules,
+                         active_schedule=active_schedule,
+                         schedule_items=schedule_items,
+                         completions=completions,
+                         today=today)
+
+@app.route('/schedule/create', methods=['GET', 'POST'])
+@login_required
+def create_schedule():
+    """Ders programı oluştur"""
+    if request.method == 'POST':
+        data = request.get_json()
+        name = data.get('name', '')
+        description = data.get('description', '')
+        items = data.get('items', [])
+        
+        if not name:
+            return jsonify({'success': False, 'error': 'Program adı gerekli!'})
+        
+        student_id = session['user_id']
+        
+        try:
+            with get_db() as conn:
+                c = get_cursor(conn)
+                
+                # Program oluştur
+                query = adapt_query('''
+                    INSERT INTO schedules (student_id, name, description)
+                    VALUES (?, ?, ?)
+                ''')
+                c.execute(query, (student_id, name, description))
+                conn.commit()
+                
+                # Yeni oluşturulan program ID'sini al
+                if USE_SUPABASE:
+                    c.execute('SELECT LASTVAL()')
+                else:
+                    c.execute('SELECT last_insert_rowid()')
+                schedule_id = c.fetchone()[0]
+                
+                # Program öğelerini ekle
+                for item in items:
+                    query = adapt_query('''
+                        INSERT INTO schedule_items 
+                        (schedule_id, day_of_week, start_time, end_time, subject, location, instructor)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''')
+                    c.execute(query, (
+                        schedule_id,
+                        int(item.get('day_of_week', 0)),
+                        item.get('start_time', ''),
+                        item.get('end_time', ''),
+                        item.get('subject', ''),
+                        item.get('location', ''),
+                        item.get('instructor', '')
+                    ))
+                
+                conn.commit()
+            
+            return jsonify({'success': True, 'schedule_id': schedule_id})
+        except Exception as e:
+            import traceback
+            print(f"HATA: {str(e)}")
+            print(traceback.format_exc())
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    return render_template('schedule.html')
+
+@app.route('/schedule/<int:schedule_id>/update', methods=['POST'])
+@login_required
+def update_schedule(schedule_id):
+    """Ders programını güncelle"""
+    data = request.get_json()
+    name = data.get('name', '')
+    description = data.get('description', '')
+    items = data.get('items', [])
+    
+    student_id = session['user_id']
+    
+    try:
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Programın öğrenciye ait olduğunu kontrol et
+            query = adapt_query('SELECT student_id FROM schedules WHERE id = ?')
+            c.execute(query, (schedule_id,))
+            schedule = c.fetchone()
+            
+            if not schedule:
+                return jsonify({'success': False, 'error': 'Program bulunamadı!'}), 404
+            
+            if schedule['student_id'] != student_id:
+                return jsonify({'success': False, 'error': 'Bu programı düzenleme yetkiniz yok!'}), 403
+            
+            # Programı güncelle
+            query = adapt_query('''
+                UPDATE schedules 
+                SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''')
+            c.execute(query, (name, description, schedule_id))
+            
+            # Eski öğeleri sil
+            query = adapt_query('DELETE FROM schedule_items WHERE schedule_id = ?')
+            c.execute(query, (schedule_id,))
+            
+            # Yeni öğeleri ekle
+            for item in items:
+                query = adapt_query('''
+                    INSERT INTO schedule_items 
+                    (schedule_id, day_of_week, start_time, end_time, subject, location, instructor)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''')
+                c.execute(query, (
+                    schedule_id,
+                    int(item.get('day_of_week', 0)),
+                    item.get('start_time', ''),
+                    item.get('end_time', ''),
+                    item.get('subject', ''),
+                    item.get('location', ''),
+                    item.get('instructor', '')
+                ))
+            
+            conn.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        import traceback
+        print(f"HATA: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/schedule/<int:schedule_id>/data')
+@login_required
+def get_schedule_data(schedule_id):
+    """Ders programı verilerini getir (düzenleme için)"""
+    student_id = session['user_id']
+    
+    try:
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Program bilgisi
+            query = adapt_query('SELECT * FROM schedules WHERE id = ?')
+            c.execute(query, (schedule_id,))
+            schedule = c.fetchone()
+            
+            if not schedule:
+                return jsonify({'success': False, 'error': 'Program bulunamadı!'}), 404
+            
+            if schedule['student_id'] != student_id:
+                return jsonify({'success': False, 'error': 'Bu programı görüntüleme yetkiniz yok!'}), 403
+            
+            # Program öğeleri
+            query = adapt_query('''
+                SELECT * FROM schedule_items
+                WHERE schedule_id = ?
+                ORDER BY day_of_week, start_time
+            ''')
+            c.execute(query, (schedule_id,))
+            items = c.fetchall()
+            
+            # SQLite için boolean dönüşümü
+            items_list = []
+            for item in items:
+                item_dict = dict(item)
+                items_list.append(item_dict)
+        
+        return jsonify({
+            'success': True,
+            'schedule': dict(schedule),
+            'items': items_list
+        })
+    except Exception as e:
+        import traceback
+        print(f"HATA: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/schedule/<int:schedule_id>/delete', methods=['POST'])
+@login_required
+def delete_schedule(schedule_id):
+    """Ders programını sil"""
+    student_id = session['user_id']
+    
+    try:
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Programın öğrenciye ait olduğunu kontrol et
+            query = adapt_query('SELECT student_id FROM schedules WHERE id = ?')
+            c.execute(query, (schedule_id,))
+            schedule = c.fetchone()
+            
+            if not schedule:
+                return jsonify({'success': False, 'error': 'Program bulunamadı!'}), 404
+            
+            if schedule['student_id'] != student_id:
+                return jsonify({'success': False, 'error': 'Bu programı silme yetkiniz yok!'}), 403
+            
+            # Programı sil (CASCADE ile öğeler de silinir)
+            query = adapt_query('DELETE FROM schedules WHERE id = ?')
+            c.execute(query, (schedule_id,))
+            conn.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/schedule/item/<int:item_id>/complete', methods=['POST'])
+@login_required
+def complete_schedule_item(item_id):
+    """Ders programı öğesini tamamla"""
+    data = request.get_json()
+    completion_date = data.get('date', '')
+    is_completed = data.get('is_completed', True)
+    notes = data.get('notes', '')
+    
+    if not completion_date:
+        from datetime import date
+        completion_date = str(date.today())
+    
+    student_id = session['user_id']
+    
+    try:
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Öğenin öğrenciye ait olduğunu kontrol et
+            query = adapt_query('''
+                SELECT s.student_id 
+                FROM schedule_items si
+                JOIN schedules s ON si.schedule_id = s.id
+                WHERE si.id = ?
+            ''')
+            c.execute(query, (item_id,))
+            result = c.fetchone()
+            
+            if not result:
+                return jsonify({'success': False, 'error': 'Ders bulunamadı!'}), 404
+            
+            if result['student_id'] != student_id:
+                return jsonify({'success': False, 'error': 'Bu dersi işaretleme yetkiniz yok!'}), 403
+            
+            # Tamamlama durumunu kontrol et (aynı tarih için)
+            query = adapt_query('''
+                SELECT id FROM schedule_completions
+                WHERE schedule_item_id = ? AND completion_date = ?
+            ''')
+            c.execute(query, (item_id, completion_date))
+            existing = c.fetchone()
+            
+            if existing:
+                # Güncelle
+                if USE_SUPABASE:
+                    completed_value = is_completed
+                else:
+                    completed_value = 1 if is_completed else 0
+                
+                query = adapt_query('''
+                    UPDATE schedule_completions
+                    SET is_completed = ?, notes = ?
+                    WHERE id = ?
+                ''')
+                c.execute(query, (completed_value, notes, existing['id']))
+            else:
+                # Yeni kayıt oluştur
+                if USE_SUPABASE:
+                    completed_value = is_completed
+                else:
+                    completed_value = 1 if is_completed else 0
+                
+                query = adapt_query('''
+                    INSERT INTO schedule_completions 
+                    (schedule_item_id, completion_date, is_completed, notes)
+                    VALUES (?, ?, ?, ?)
+                ''')
+                c.execute(query, (item_id, completion_date, completed_value, notes))
+            
+            conn.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        import traceback
+        print(f"HATA: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/schedule/<int:student_id>')
+@admin_required
+def admin_view_schedule(student_id):
+    """Admin - öğrenci ders programını görüntüle"""
+    with get_db() as conn:
+        c = get_cursor(conn)
+        
+        # Öğrenci bilgisi
+        query = adapt_query('SELECT * FROM students WHERE id = ?')
+        c.execute(query, (student_id,))
+        student = c.fetchone()
+        
+        if not student:
+            flash('Öğrenci bulunamadı!', 'error')
+            return redirect(url_for('admin_dashboard'))
+        
+        # Öğrencinin ders programlarını al
+        query = adapt_query('''
+            SELECT * FROM schedules
+            WHERE student_id = ?
+            ORDER BY created_at DESC
+        ''')
+        c.execute(query, (student_id,))
+        schedules = c.fetchall()
+        
+        # Aktif program varsa onu al
+        active_schedule = None
+        schedule_items = []
+        completions = {}
+        
+        if schedules:
+            active_schedule = schedules[0]  # En son oluşturulan program
+            
+            # Program öğelerini al
+            query = adapt_query('''
+                SELECT * FROM schedule_items
+                WHERE schedule_id = ?
+                ORDER BY day_of_week, start_time
+            ''')
+            c.execute(query, (active_schedule['id'],))
+            schedule_items = c.fetchall()
+            
+            # Tamamlama durumlarını al
+            from datetime import date
+            today_date = date.today()
+            
+            for item in schedule_items:
+                query = adapt_query('''
+                    SELECT * FROM schedule_completions
+                    WHERE schedule_item_id = ? AND completion_date <= ?
+                    ORDER BY completion_date DESC
+                ''')
+                c.execute(query, (item['id'], today_date))
+                item_completions = c.fetchall()
+                # SQLite için boolean dönüşümü
+                processed_completions = []
+                for comp in item_completions:
+                    comp_dict = dict(comp)
+                    if not USE_SUPABASE:
+                        comp_dict['is_completed'] = bool(comp_dict['is_completed'])
+                    processed_completions.append(comp_dict)
+                completions[item['id']] = processed_completions
+    
+    from datetime import date
+    today = str(date.today())
+    
+    return render_template('admin_schedule.html',
+                         student=student,
+                         schedules=schedules,
+                         active_schedule=active_schedule,
+                         schedule_items=schedule_items,
+                         completions=completions,
+                         today=today)
+
 if __name__ == '__main__':
     try:
         # Veritabanını başlat
