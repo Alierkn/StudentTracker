@@ -47,7 +47,13 @@
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Kaydet</button>
+                <button type="submit" class="btn btn-primary btn-confetti" id="submitBtn">
+                    <span class="btn-text" id="btnText">Kaydet</span>
+                    <div class="spinner" id="loadingSpinner"></div>
+                    <svg class="checkmark" id="successIcon" viewBox="0 0 52 52">
+                        <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                    </svg>
+                </button>
                 <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">İptal</a>
             </div>
         </form>
@@ -150,12 +156,83 @@
     // Onayla ve gönder
     function confirmSubmit() {
         const form = document.getElementById('studyForm');
-        if (form) {
-            // Modal'ı kapat
-            closeModal();
-            // Formu gönder
-            form.submit();
+        const submitBtn = document.getElementById('submitBtn');
+        const btnText = document.getElementById('btnText');
+        const spinner = document.getElementById('loadingSpinner');
+        const successIcon = document.getElementById('successIcon');
+        const checkPath = successIcon.querySelector('path');
+        
+        if (!form || !submitBtn) return;
+        
+        // Modal'ı kapat
+        closeModal();
+        
+        // Butonu disable et
+        submitBtn.disabled = true;
+        
+        // 1. Aşama: Yükleniyor Modu
+        btnText.style.opacity = '0';
+        setTimeout(() => {
+            spinner.style.display = 'block';
+        }, 300);
+        
+        // 2. Aşama: İşlem Simülasyonu (1.5 saniye bekle)
+        setTimeout(() => {
+            spinner.style.display = 'none';
+            
+            // Butonu yuvarlak hale getir
+            submitBtn.classList.add('btn-success');
+            
+            // Tik işaretini göster ve animasyonu başlat
+            setTimeout(() => {
+                successIcon.classList.add('animate-check');
+                triggerConfetti(submitBtn);
+                
+                // Formu gönder
+                setTimeout(() => {
+                    form.submit();
+                }, 500);
+            }, 300);
+        }, 1500);
+    }
+    
+    // Konfeti Fonksiyonu
+    function triggerConfetti(btn) {
+        if (typeof confetti === 'undefined') {
+            console.warn('Konfeti kütüphanesi yüklenmedi');
+            return;
         }
+        
+        // Butonun konumunu al
+        const rect = btn.getBoundingClientRect();
+        const x = (rect.left + rect.width / 2) / window.innerWidth;
+        const y = (rect.top + rect.height / 2) / window.innerHeight;
+        
+        // Efekt 1: Merkezden patlama
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { x: x, y: y },
+            colors: ['#5cffa1', '#ffffff', '#FFD700', '#FF69B4', '#2563eb', '#7c3aed']
+        });
+        
+        // Efekt 2: Yanlardan patlama (kısa gecikmeli)
+        setTimeout(() => {
+            confetti({
+                particleCount: 50,
+                angle: 60,
+                spread: 55,
+                origin: { x: 0 },
+                colors: ['#5cffa1', '#ffffff', '#2563eb']
+            });
+            confetti({
+                particleCount: 50,
+                angle: 120,
+                spread: 55,
+                origin: { x: 1 },
+                colors: ['#5cffa1', '#ffffff', '#7c3aed']
+            });
+        }, 200);
     }
 
     // Modal'ı kapat

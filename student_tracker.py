@@ -721,6 +721,53 @@ def admin_student_detail(student_id):
     
     return render_template('admin_student_detail.html', student=student, sessions=sessions, exams=exams)
 
+@app.route('/admin/student/<int:student_id>/delete', methods=['POST'])
+@admin_required
+def delete_student(student_id):
+    """Admin - öğrenciyi sil"""
+    try:
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Öğrencinin var olup olmadığını ve admin olmadığını kontrol et
+            query = adapt_query('SELECT id, username, is_admin FROM students WHERE id = ?')
+            c.execute(query, (student_id,))
+            student = c.fetchone()
+            
+            if not student:
+                return jsonify({'success': False, 'error': 'Öğrenci bulunamadı!'}), 404
+            
+            # Admin kullanıcılarını silmeyi engelle
+            if USE_SUPABASE:
+                is_admin = student.get('is_admin', False)
+            else:
+                is_admin = bool(student.get('is_admin', 0))
+            
+            if is_admin:
+                return jsonify({'success': False, 'error': 'Admin kullanıcıları silinemez!'}), 403
+            
+            # Öğrenciyi sil (CASCADE ile tüm ilişkili kayıtlar otomatik silinir)
+            query = adapt_query('DELETE FROM students WHERE id = ? AND is_admin = ?')
+            if USE_SUPABASE:
+                c.execute(query, (student_id, False))
+            else:
+                c.execute(query, (student_id, 0))
+            
+            conn.commit()
+            
+            # Silinen kayıt sayısını kontrol et
+            if c.rowcount > 0:
+                flash(f'Öğrenci ({student["username"]}) başarıyla silindi!', 'success')
+                return jsonify({'success': True, 'message': 'Öğrenci başarıyla silindi!'})
+            else:
+                return jsonify({'success': False, 'error': 'Öğrenci silinemedi!'}), 500
+    
+    except Exception as e:
+        import traceback
+        print(f"HATA: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # DERS PROGRAMI ROUTE'LARI
 
 @app.route('/schedule')

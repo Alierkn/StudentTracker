@@ -983,6 +983,9 @@ body {
 
 .student-actions {
     margin-top: 1.5rem;
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 /* Student Detail */
@@ -1227,6 +1230,19 @@ body {
 
 .btn-success::before {
     background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+    color: white;
+    box-shadow: var(--shadow-lg);
+    border: none;
+}
+
+.btn-danger:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-xl);
+    background: linear-gradient(135deg, #dc2626 0%, var(--danger) 100%);
 }
 
 /* Delete Button */
@@ -1692,6 +1708,9 @@ body {
 
 .detail-actions {
     margin-top: 1rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
 }
 
 /* Responsive */
@@ -1713,4 +1732,70 @@ body {
         width: 95%;
         margin: 1rem auto;
     }
+}
+
+/* Konfeti Buton Animasyonları */
+.btn-confetti {
+    position: relative;
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow: hidden;
+    min-width: 180px;
+}
+
+.btn-confetti .btn-text {
+    transition: opacity 0.3s ease;
+    z-index: 10;
+}
+
+.btn-confetti .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+@keyframes spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.btn-confetti .checkmark {
+    width: 24px;
+    height: 24px;
+    stroke-width: 3;
+    stroke: #5cffa1;
+    stroke-miterlimit: 10;
+    fill: none;
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.btn-confetti .checkmark path {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    transition: stroke-dashoffset 0.6s cubic-bezier(0.65, 0, 0.45, 1);
+}
+
+.btn-confetti.btn-success {
+    width: 60px !important;
+    border-radius: 50% !important;
+    color: transparent !important;
+    pointer-events: none;
+}
+
+.btn-confetti.btn-success .checkmark {
+    display: block;
+}
+
+.btn-confetti.btn-success .checkmark.animate-check path {
+    stroke-dashoffset: 0;
 }

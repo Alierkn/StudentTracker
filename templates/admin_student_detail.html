@@ -10,6 +10,9 @@
         <p class="subtitle">@{{ student.username }} - {{ student.email or 'E-posta yok' }}</p>
         <div class="detail-actions">
             <a href="{{ url_for('admin_view_schedule', student_id=student.id) }}" class="btn btn-primary">📅 Ders Programını Görüntüle</a>
+            <button onclick="deleteStudent({{ student.id }}, '{{ student.username }}')" class="btn btn-danger" title="Öğrenciyi Sil">
+                🗑️ Öğrenciyi Sil
+            </button>
         </div>
     </div>
 
@@ -95,5 +98,35 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function deleteStudent(studentId, username) {
+        if (!confirm(`"${username}" kullanıcısını silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz! Öğrencinin tüm çalışma kayıtları, sınav sonuçları ve ders programları da silinecektir.`)) {
+            return;
+        }
+        
+        fetch(`/admin/student/${studentId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Öğrenci başarıyla silindi!');
+                window.location.href = '{{ url_for("admin_dashboard") }}';
+            } else {
+                alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(error => {
+            console.error('Silme hatası:', error);
+            alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+        });
+    }
+</script>
 {% endblock %}
 
