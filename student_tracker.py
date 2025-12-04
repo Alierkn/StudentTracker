@@ -584,60 +584,80 @@ def dashboard():
 @login_required
 def leaderboard():
     """Yarışma/Leaderboard sayfası"""
-    with get_db() as conn:
-        c = get_cursor(conn)
+    try:
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Admin kontrolü için uyumlu sorgu
+            if USE_SUPABASE:
+                admin_condition = "is_admin = FALSE"
+            else:
+                admin_condition = "is_admin = 0"
+            
+            # Streak leaderboard (current_streak'e göre)
+            # Kolonlar yoksa hata vermemesi için COALESCE kullan
+            query = adapt_query(f'''
+                SELECT 
+                    id, 
+                    username, 
+                    full_name, 
+                    COALESCE(current_streak, 0) as current_streak, 
+                    COALESCE(longest_streak, 0) as longest_streak
+                FROM students
+                WHERE {admin_condition}
+                ORDER BY COALESCE(current_streak, 0) DESC, COALESCE(longest_streak, 0) DESC
+                LIMIT 50
+            ''')
+            c.execute(query)
+            streak_leaderboard = c.fetchall()
+            
+            # Toplam saat leaderboard
+            query = adapt_query(f'''
+                SELECT 
+                    s.id,
+                    s.username,
+                    s.full_name,
+                    COALESCE(SUM(ss.hours), 0) as total_hours,
+                    COUNT(DISTINCT ss.date) as study_days
+                FROM students s
+                LEFT JOIN study_sessions ss ON s.id = ss.student_id
+                WHERE s.{admin_condition}
+                GROUP BY s.id, s.username, s.full_name
+                ORDER BY total_hours DESC
+                LIMIT 50
+            ''')
+            c.execute(query)
+            hours_leaderboard = c.fetchall()
+            
+            # Çalışma sayısı leaderboard
+            query = adapt_query(f'''
+                SELECT 
+                    s.id,
+                    s.username,
+                    s.full_name,
+                    COUNT(ss.id) as total_sessions,
+                    COALESCE(AVG(ss.efficiency), 0) as avg_efficiency
+                FROM students s
+                LEFT JOIN study_sessions ss ON s.id = ss.student_id
+                WHERE s.{admin_condition}
+                GROUP BY s.id, s.username, s.full_name
+                ORDER BY total_sessions DESC
+                LIMIT 50
+            ''')
+            c.execute(query)
+            sessions_leaderboard = c.fetchall()
         
-        # Streak leaderboard (current_streak'e göre)
-        query = adapt_query('''
-            SELECT id, username, full_name, current_streak, longest_streak
-            FROM students
-            WHERE is_admin = FALSE OR is_admin = 0
-            ORDER BY current_streak DESC, longest_streak DESC
-            LIMIT 50
-        ''')
-        c.execute(query)
-        streak_leaderboard = c.fetchall()
-        
-        # Toplam saat leaderboard
-        query = adapt_query('''
-            SELECT 
-                s.id,
-                s.username,
-                s.full_name,
-                COALESCE(SUM(ss.hours), 0) as total_hours,
-                COUNT(DISTINCT ss.date) as study_days
-            FROM students s
-            LEFT JOIN study_sessions ss ON s.id = ss.student_id
-            WHERE s.is_admin = FALSE OR s.is_admin = 0
-            GROUP BY s.id, s.username, s.full_name
-            ORDER BY total_hours DESC
-            LIMIT 50
-        ''')
-        c.execute(query)
-        hours_leaderboard = c.fetchall()
-        
-        # Çalışma sayısı leaderboard
-        query = adapt_query('''
-            SELECT 
-                s.id,
-                s.username,
-                s.full_name,
-                COUNT(ss.id) as total_sessions,
-                COALESCE(AVG(ss.efficiency), 0) as avg_efficiency
-            FROM students s
-            LEFT JOIN study_sessions ss ON s.id = ss.student_id
-            WHERE s.is_admin = FALSE OR s.is_admin = 0
-            GROUP BY s.id, s.username, s.full_name
-            ORDER BY total_sessions DESC
-            LIMIT 50
-        ''')
-        c.execute(query)
-        sessions_leaderboard = c.fetchall()
+        return render_template('leaderboard.html',
+                             streak_leaderboard=streak_leaderboard or [],
+                             hours_leaderboard=hours_leaderboard or [],
+                             sessions_leaderboard=sessions_leaderboard or [])
     
-    return render_template('leaderboard.html',
-                         streak_leaderboard=streak_leaderboard,
-                         hours_leaderboard=hours_leaderboard,
-                         sessions_leaderboard=sessions_leaderboard)
+    except Exception as e:
+        import traceback
+        print(f"❌ Leaderboard hatası: {e}")
+        traceback.print_exc()
+        flash(f'Leaderboard yüklenirken hata oluştu: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
 
 @app.route('/add-study', methods=['GET', 'POST'])
 @login_required
