@@ -5,8 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Öğrenci Takip Sistemi - EducationalTR{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Toastify CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Toastify JS -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -38,14 +42,12 @@
     </nav>
 
     <div class="container">
+        <!-- Flash messages - Hidden, will be shown as toasts -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <div class="flash-messages">
+                <div id="flash-messages-data" style="display: none;">
                     {% for category, message in messages %}
-                        <div class="flash-message flash-{{ category }}">
-                            <span>{{ message }}</span>
-                            <button class="flash-close" onclick="this.parentElement.remove()">×</button>
-                        </div>
+                        <div data-category="{{ category }}" data-message="{{ message }}"></div>
                     {% endfor %}
                 </div>
             {% endif %}
@@ -66,6 +68,79 @@
     </footer>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+    <!-- Toast Notification System -->
+    <script>
+        // Toast notification function
+        function showToast(message, type = 'success') {
+            // Color scheme based on message type
+            const colors = {
+                'success': {
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    icon: '✅'
+                },
+                'info': {
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    icon: 'ℹ️'
+                },
+                'warning': {
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    icon: '⚠️'
+                },
+                'error': {
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    icon: '❌'
+                }
+            };
+
+            const config = colors[type] || colors.success;
+
+            Toastify({
+                text: `${config.icon} ${message}`,
+                duration: 4000,  // 4 seconds
+                close: true,     // Show close button
+                gravity: "top",  // Top position
+                position: "right", // Right side
+                stopOnFocus: true, // Pause on hover
+                style: {
+                    background: config.background,
+                    borderRadius: "12px",
+                    padding: "16px 24px",
+                    fontSize: "15px",
+                    fontWeight: "500",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
+                    fontFamily: "'Poppins', sans-serif",
+                    color: "#ffffff",
+                    cursor: "pointer"
+                },
+                offset: {
+                    y: 80 // Offset from top (below navbar)
+                },
+                onClick: function() {
+                    // Click to dismiss
+                    this.hideToast();
+                }
+            }).showToast();
+        }
+
+        // Display flash messages as toasts on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const flashContainer = document.getElementById('flash-messages-data');
+            if (flashContainer) {
+                const messages = flashContainer.querySelectorAll('[data-message]');
+                messages.forEach((msgElement, index) => {
+                    const category = msgElement.getAttribute('data-category');
+                    const message = msgElement.getAttribute('data-message');
+
+                    // Stagger toast appearance (200ms delay between each)
+                    setTimeout(() => {
+                        showToast(message, category);
+                    }, index * 200);
+                });
+            }
+        });
+    </script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -2106,6 +2106,47 @@ body {
     }
 }
 
+/* Toast Notification Custom Styles */
+.toastify {
+    font-family: 'Poppins', sans-serif !important;
+    z-index: 10000 !important;
+}
+
+.toastify.on {
+    animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Toast close button styling */
+.toastify .toast-close {
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.toastify .toast-close:hover {
+    opacity: 1;
+}
+
+/* Responsive toast positioning */
+@media (max-width: 768px) {
+    .toastify {
+        width: calc(100% - 2rem) !important;
+        margin: 0 1rem !important;
+        right: 0 !important;
+        left: 0 !important;
+    }
+}
+
 /* Leaderboard Styles */
 .leaderboard-page {
     padding: 2rem 0;
