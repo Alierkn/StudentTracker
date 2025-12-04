@@ -9,6 +9,43 @@
         <p class="subtitle">Çalışma istatistikleriniz ve gelişiminiz</p>
     </div>
 
+    <!-- Streak Counter - Özel Kart -->
+    <div class="streak-card {% if not current_streak or current_streak == 0 %}zero-streak{% endif %}">
+        <div class="streak-content">
+            <div class="streak-icon">🔥</div>
+            <div class="streak-info">
+                <h2>Üst Üste Çalışma Serisi</h2>
+                <div class="streak-number">{{ current_streak or 0 }} Gün</div>
+                <p class="streak-subtitle">En uzun seri: {{ longest_streak or 0 }} gün</p>
+
+                <!-- Streak Rozetleri -->
+                <div class="streak-badges">
+                    {% if current_streak and current_streak >= 365 %}
+                    <div class="streak-badge legendary">👑 TANRI - 365+ Gün</div>
+                    {% elif current_streak and current_streak >= 100 %}
+                    <div class="streak-badge legendary">💎 EFSANE - 100+ Gün</div>
+                    {% elif current_streak and current_streak >= 30 %}
+                    <div class="streak-badge epic">⭐ KARARLI - 30+ Gün</div>
+                    {% elif current_streak and current_streak >= 7 %}
+                    <div class="streak-badge rare">🎯 İSTİKRARLI - 7+ Gün</div>
+                    {% elif current_streak and current_streak > 0 %}
+                    <div class="streak-badge common">🔥 YENİ BAŞLANGIÇ</div>
+                    {% endif %}
+                </div>
+
+                {% if current_streak and current_streak >= 30 %}
+                <div class="streak-message">Efsane! 1 ay tamamladın! 🌟</div>
+                {% elif current_streak and current_streak >= 7 %}
+                <div class="streak-message">Muhteşem! 1 hafta tamamladın! 🎉</div>
+                {% elif current_streak and current_streak > 0 %}
+                <div class="streak-message">Harika! Devam ediyorsun! 💪</div>
+                {% else %}
+                <div class="streak-message">Bugün çalışmaya başla ve serini başlat! 🚀</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
     <!-- İstatistik Kartları -->
     <div class="stats-grid">
         <div class="stat-card">

@@ -24,6 +24,7 @@
                 <a href="{{ url_for('add_study') }}" class="nav-link">Çalışma Ekle</a>
                 <a href="{{ url_for('add_exam') }}" class="nav-link">Sınav Ekle</a>
                 <a href="{{ url_for('schedule') }}" class="nav-link">Ders Programı</a>
+                <a href="{{ url_for('leaderboard') }}" class="nav-link leaderboard-link">🏆 Yarışma</a>
                 {% if session.is_admin %}
                 <a href="{{ url_for('admin_dashboard') }}" class="nav-link admin-link">Admin Panel</a>
                 {% endif %}

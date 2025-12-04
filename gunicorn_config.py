@@ -13,10 +13,26 @@ def on_starting(server):
     
     try:
         print("🔄 Veritabanı başlatılıyor...")
+        # init_db() sadece tabloları oluşturur, mevcut verilere dokunmaz
         init_db()
         print("✅ Veritabanı hazır.")
         if USE_SUPABASE:
             print("📁 Veritabanı: Supabase PostgreSQL")
+            # Veri kontrolü
+            try:
+                from database import get_db
+                from psycopg2.extras import RealDictCursor
+                with get_db() as conn:
+                    c = conn.cursor(cursor_factory=RealDictCursor)
+                    c.execute('SELECT COUNT(*) as count FROM students')
+                    result = c.fetchone()
+                    if result:
+                        count = result.get('count', 0) if isinstance(result, dict) else result[0]
+                        print(f"📊 Mevcut öğrenci sayısı: {count}")
+                        if count == 0:
+                            print("⚠️  UYARI: Veritabanında öğrenci bulunamadı!")
+            except Exception as check_err:
+                print(f"⚠️  Veri kontrolü hatası: {check_err}")
         else:
             print("📁 Veritabanı: SQLite (Local)")
     except Exception as e:

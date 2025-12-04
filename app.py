@@ -10,6 +10,7 @@ import os
 if __name__ == '__main__':
     try:
         # Veritabanını başlat
+        # ÖNEMLİ: init_db() sadece tabloları oluşturur, mevcut verilere dokunmaz
         init_db()
         
         port = int(os.environ.get('PORT', 5002))

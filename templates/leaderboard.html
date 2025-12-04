@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Yarışma - EducationalTR Öğrenci Takip Sistemi{% endblock %}
+
+{% block content %}
+<div class="leaderboard-page">
+    <div class="leaderboard-header">
+        <h1>🏆 Çalışma Yarışması</h1>
+        <p class="subtitle">En çok çalışan öğrenciler - Streak liderliği</p>
+    </div>
+
+    <!-- Filtreler -->
+    <div class="leaderboard-filters">
+        <button class="filter-btn active" onclick="filterLeaderboard('streak')" data-filter="streak">
+            🔥 Streak
+        </button>
+        <button class="filter-btn" onclick="filterLeaderboard('hours')" data-filter="hours">
+            ⏰ Toplam Saat
+        </button>
+        <button class="filter-btn" onclick="filterLeaderboard('sessions')" data-filter="sessions">
+            📖 Çalışma Sayısı
+        </button>
+    </div>
+
+    <!-- Leaderboard Listesi -->
+    <div class="leaderboard-container">
+        <div id="streak-leaderboard" class="leaderboard-list active">
+            <div class="leaderboard-title">
+                <h2>🔥 Üst Üste Çalışma Serisi</h2>
+                <p>En uzun streak rekorları</p>
+            </div>
+            
+            {% if streak_leaderboard %}
+                {% for student in streak_leaderboard %}
+                <div class="leaderboard-item {% if student.id == session.user_id %}current-user{% endif %}">
+                    <div class="rank-badge">
+                        {% if loop.index == 1 %}
+                            <span class="rank-number gold">🥇</span>
+                        {% elif loop.index == 2 %}
+                            <span class="rank-number silver">🥈</span>
+                        {% elif loop.index == 3 %}
+                            <span class="rank-number bronze">🥉</span>
+                        {% else %}
+                            <span class="rank-number">{{ loop.index }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="leaderboard-content">
+                        <div class="student-info">
+                            <h3>{{ student.full_name }}</h3>
+                            <p class="student-username">@{{ student.username }}</p>
+                        </div>
+                        <div class="leaderboard-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Mevcut Streak</span>
+                                <span class="stat-value streak-value">{{ student.current_streak or 0 }} 🔥</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">En Uzun Streak</span>
+                                <span class="stat-value">{{ student.longest_streak or 0 }} gün</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% if student.id == session.user_id %}
+                    <div class="you-badge">Sen</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>Henüz yarışma verisi yok. İlk çalışma kaydını ekleyerek başla! 🚀</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div id="hours-leaderboard" class="leaderboard-list">
+            <div class="leaderboard-title">
+                <h2>⏰ Toplam Çalışma Saatleri</h2>
+                <p>En çok çalışan öğrenciler</p>
+            </div>
+            
+            {% if hours_leaderboard %}
+                {% for student in hours_leaderboard %}
+                <div class="leaderboard-item {% if student.id == session.user_id %}current-user{% endif %}">
+                    <div class="rank-badge">
+                        {% if loop.index == 1 %}
+                            <span class="rank-number gold">🥇</span>
+                        {% elif loop.index == 2 %}
+                            <span class="rank-number silver">🥈</span>
+                        {% elif loop.index == 3 %}
+                            <span class="rank-number bronze">🥉</span>
+                        {% else %}
+                            <span class="rank-number">{{ loop.index }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="leaderboard-content">
+                        <div class="student-info">
+                            <h3>{{ student.full_name }}</h3>
+                            <p class="student-username">@{{ student.username }}</p>
+                        </div>
+                        <div class="leaderboard-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Toplam Saat</span>
+                                <span class="stat-value hours-value">{{ "%.1f"|format(student.total_hours or 0) }} ⏰</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Çalışma Günü</span>
+                                <span class="stat-value">{{ student.study_days or 0 }} gün</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% if student.id == session.user_id %}
+                    <div class="you-badge">Sen</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>Henüz yarışma verisi yok. İlk çalışma kaydını ekleyerek başla! 🚀</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div id="sessions-leaderboard" class="leaderboard-list">
+            <div class="leaderboard-title">
+                <h2>📖 Toplam Çalışma Sayısı</h2>
+                <p>En aktif öğrenciler</p>
+            </div>
+            
+            {% if sessions_leaderboard %}
+                {% for student in sessions_leaderboard %}
+                <div class="leaderboard-item {% if student.id == session.user_id %}current-user{% endif %}">
+                    <div class="rank-badge">
+                        {% if loop.index == 1 %}
+                            <span class="rank-number gold">🥇</span>
+                        {% elif loop.index == 2 %}
+                            <span class="rank-number silver">🥈</span>
+                        {% elif loop.index == 3 %}
+                            <span class="rank-number bronze">🥉</span>
+                        {% else %}
+                            <span class="rank-number">{{ loop.index }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="leaderboard-content">
+                        <div class="student-info">
+                            <h3>{{ student.full_name }}</h3>
+                            <p class="student-username">@{{ student.username }}</p>
+                        </div>
+                        <div class="leaderboard-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Toplam Çalışma</span>
+                                <span class="stat-value sessions-value">{{ student.total_sessions or 0 }} 📖</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Ortalama Verimlilik</span>
+                                <span class="stat-value">{{ "%.0f"|format(student.avg_efficiency or 0) }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% if student.id == session.user_id %}
+                    <div class="you-badge">Sen</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>Henüz yarışma verisi yok. İlk çalışma kaydını ekleyerek başla! 🚀</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function filterLeaderboard(type) {
+    // Tüm leaderboard listelerini gizle
+    document.querySelectorAll('.leaderboard-list').forEach(list => {
+        list.classList.remove('active');
+    });
+    
+    // Seçili listeyi göster
+    document.getElementById(type + '-leaderboard').classList.add('active');
+    
+    // Filtre butonlarını güncelle
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-filter="${type}"]`).classList.add('active');
+}
+</script>
+{% endblock %}
+

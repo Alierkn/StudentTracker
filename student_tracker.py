@@ -6,7 +6,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import os
 import json
 from functools import wraps
@@ -50,6 +50,124 @@ def get_google_oauth():
         except ImportError:
             pass
     return _google_oauth
+
+def update_streak(student_id, study_date):
+    """
+    Öğrencinin streak'ini güncelle
+    Streak: Üst üste çalışma günü sayısı
+
+    Returns:
+        dict: {
+            'streak_increased': bool,
+            'same_day': bool,
+            'new_streak': int,
+            'old_streak': int,
+            'broken': bool
+        }
+    """
+    try:
+        with get_db() as conn:
+            c = get_cursor(conn)
+
+            # Öğrencinin mevcut streak bilgilerini al
+            query = adapt_query('''
+                SELECT current_streak, longest_streak, last_study_date
+                FROM students
+                WHERE id = ?
+            ''')
+            c.execute(query, (student_id,))
+            student = c.fetchone()
+
+            if not student:
+                return {'streak_increased': False, 'same_day': False, 'new_streak': 0, 'old_streak': 0, 'broken': False}
+
+            # Kolonlar yoksa (eski veritabanı) varsayılan değerler kullan
+            current_streak = student.get('current_streak', 0) if isinstance(student, dict) else (student[0] if len(student) > 0 else 0)
+            longest_streak = student.get('longest_streak', 0) if isinstance(student, dict) else (student[1] if len(student) > 1 else 0)
+            last_study_date = student.get('last_study_date', None) if isinstance(student, dict) else (student[2] if len(student) > 2 else None)
+
+            old_streak = current_streak  # Eski streak'i sakla
+
+            # Tarihi parse et
+            if isinstance(study_date, str):
+                study_date_obj = datetime.strptime(study_date, '%Y-%m-%d').date()
+            else:
+                study_date_obj = study_date if isinstance(study_date, date) else study_date.date()
+
+            today = date.today()
+            yesterday = today - timedelta(days=1)
+
+            # Streak hesapla
+            new_streak = 1  # Varsayılan: yeni streak başlat
+            same_day = False
+            streak_broken = False
+
+            if last_study_date:
+                if isinstance(last_study_date, str):
+                    last_date = datetime.strptime(last_study_date, '%Y-%m-%d').date()
+                else:
+                    last_date = last_study_date if isinstance(last_study_date, date) else last_study_date.date()
+
+                # Eğer bugün veya dün çalıştıysa streak devam eder
+                if study_date_obj == today or study_date_obj == yesterday:
+                    if last_date == yesterday or last_date == today:
+                        # Streak devam ediyor
+                        new_streak = current_streak + 1
+                    elif last_date == today and study_date_obj == today:
+                        # Bugün zaten çalışma kaydı var, streak artmaz
+                        new_streak = current_streak
+                        same_day = True
+                    else:
+                        # Streak kırıldı, yeni streak başlat
+                        new_streak = 1
+                        streak_broken = True
+                else:
+                    # Geçmiş tarih, streak hesaplama
+                    days_diff = (study_date_obj - last_date).days
+                    if days_diff == 1:
+                        # Üst üste çalışma
+                        new_streak = current_streak + 1
+                    else:
+                        # Streak kırıldı
+                        new_streak = 1
+                        streak_broken = True
+
+            # En uzun streak'i güncelle
+            if new_streak > longest_streak:
+                longest_streak = new_streak
+
+            # Veritabanını güncelle
+            # Önce kolonların var olup olmadığını kontrol et
+            try:
+                query = adapt_query('''
+                    UPDATE students
+                    SET current_streak = ?,
+                        longest_streak = ?,
+                        last_study_date = ?
+                    WHERE id = ?
+                ''')
+                c.execute(query, (new_streak, longest_streak, study_date_obj, student_id))
+                conn.commit()
+            except Exception as e:
+                # Kolonlar yoksa, önce ekle (migration)
+                if 'column' in str(e).lower() or 'does not exist' in str(e).lower():
+                    print(f"⚠️  Streak kolonları bulunamadı. Migration script'ini çalıştırın: python add_streak_columns.py")
+                else:
+                    raise
+
+            return {
+                'streak_increased': new_streak > old_streak,
+                'same_day': same_day,
+                'new_streak': new_streak,
+                'old_streak': old_streak,
+                'broken': streak_broken
+            }
+
+    except Exception as e:
+        print(f"⚠️  Streak güncelleme hatası: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'streak_increased': False, 'same_day': False, 'new_streak': 0, 'old_streak': 0, 'broken': False}
 
 # Veritabanını başlat (Gunicorn için)
 # Gunicorn ile çalışırken if __name__ == '__main__' çalışmaz
@@ -405,13 +523,121 @@ def dashboard():
         ''')
         c.execute(query, (student_id,))
         avg_result = c.fetchone()
-    
+        
+        # Streak bilgilerini al
+        query = adapt_query('''
+            SELECT current_streak, longest_streak, last_study_date
+            FROM students
+            WHERE id = ?
+        ''')
+        c.execute(query, (student_id,))
+        streak_data = c.fetchone()
+        
+        # Streak değerlerini parse et
+        current_streak = 0
+        longest_streak = 0
+        last_study_date = None
+
+        if streak_data:
+            if isinstance(streak_data, dict):
+                current_streak = streak_data.get('current_streak', 0) or 0
+                longest_streak = streak_data.get('longest_streak', 0) or 0
+                last_study_date = streak_data.get('last_study_date')
+            else:
+                current_streak = streak_data[0] if len(streak_data) > 0 and streak_data[0] else 0
+                longest_streak = streak_data[1] if len(streak_data) > 1 and streak_data[1] else 0
+                last_study_date = streak_data[2] if len(streak_data) > 2 else None
+
+        # Streak kırılma kontrolü (sadece bir kez göster)
+        if not session.get('streak_warning_shown'):
+            if last_study_date and current_streak > 0:
+                from datetime import date, timedelta
+                if isinstance(last_study_date, str):
+                    last_date = datetime.strptime(last_study_date, '%Y-%m-%d').date()
+                else:
+                    last_date = last_study_date if isinstance(last_study_date, date) else last_study_date.date()
+
+                today = date.today()
+                yesterday = today - timedelta(days=1)
+
+                # Eğer son çalışma bugün veya dün değilse, streak tehlikede
+                if last_date < yesterday:
+                    days_since = (today - last_date).days
+                    flash(f'⚠️ Son çalışmanın {days_since} gün önce. Streak\'in sıfırlanmak üzere! Bugün çalış ve serini koru! 🔥', 'warning')
+                    session['streak_warning_shown'] = True
+            elif current_streak == 0 and last_study_date:
+                # Streak zaten kırılmış
+                if not session.get('streak_broken_shown'):
+                    flash('Streak\'in kırıldı ama vazgeçme! Yeni bir seri başlat! 💪', 'info')
+                    session['streak_broken_shown'] = True
+
     return render_template('dashboard.html',
                          daily_stats=daily_stats,
                          stats=stats,
                          recent_sessions=recent_sessions,
                          exams=exams,
-                         avg_percentage=avg_result['avg_percentage'] if avg_result['avg_percentage'] else 0)
+                         avg_percentage=avg_result['avg_percentage'] if avg_result['avg_percentage'] else 0,
+                         current_streak=current_streak,
+                         longest_streak=longest_streak)
+
+@app.route('/leaderboard')
+@login_required
+def leaderboard():
+    """Yarışma/Leaderboard sayfası"""
+    with get_db() as conn:
+        c = get_cursor(conn)
+        
+        # Streak leaderboard (current_streak'e göre)
+        query = adapt_query('''
+            SELECT id, username, full_name, current_streak, longest_streak
+            FROM students
+            WHERE is_admin = FALSE OR is_admin = 0
+            ORDER BY current_streak DESC, longest_streak DESC
+            LIMIT 50
+        ''')
+        c.execute(query)
+        streak_leaderboard = c.fetchall()
+        
+        # Toplam saat leaderboard
+        query = adapt_query('''
+            SELECT 
+                s.id,
+                s.username,
+                s.full_name,
+                COALESCE(SUM(ss.hours), 0) as total_hours,
+                COUNT(DISTINCT ss.date) as study_days
+            FROM students s
+            LEFT JOIN study_sessions ss ON s.id = ss.student_id
+            WHERE s.is_admin = FALSE OR s.is_admin = 0
+            GROUP BY s.id, s.username, s.full_name
+            ORDER BY total_hours DESC
+            LIMIT 50
+        ''')
+        c.execute(query)
+        hours_leaderboard = c.fetchall()
+        
+        # Çalışma sayısı leaderboard
+        query = adapt_query('''
+            SELECT 
+                s.id,
+                s.username,
+                s.full_name,
+                COUNT(ss.id) as total_sessions,
+                COALESCE(AVG(ss.efficiency), 0) as avg_efficiency
+            FROM students s
+            LEFT JOIN study_sessions ss ON s.id = ss.student_id
+            WHERE s.is_admin = FALSE OR s.is_admin = 0
+            GROUP BY s.id, s.username, s.full_name
+            ORDER BY total_sessions DESC
+            LIMIT 50
+        ''')
+        c.execute(query)
+        sessions_leaderboard = c.fetchall()
+    
+    return render_template('leaderboard.html',
+                         streak_leaderboard=streak_leaderboard,
+                         hours_leaderboard=hours_leaderboard,
+                         sessions_leaderboard=sessions_leaderboard)
 
 @app.route('/add-study', methods=['GET', 'POST'])
 @login_required
@@ -447,16 +673,30 @@ def add_study():
                 return redirect(url_for('add_study'))
             
             # Veritabanına kaydet
+            student_id = session.get('user_id')
             with get_db() as conn:
                 c = get_cursor(conn)
                 query = adapt_query('''
                     INSERT INTO study_sessions (student_id, date, subject, hours, efficiency, notes, difficulties)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''')
-                c.execute(query, (session.get('user_id'), date, subject, hours, efficiency, notes, difficulties))
+                c.execute(query, (student_id, date, subject, hours, efficiency, notes, difficulties))
                 conn.commit()
-            
+
+            # Streak'i güncelle ve sonuca göre mesaj göster
+            streak_result = update_streak(student_id, date)
+
+            # Başarı mesajı
             flash('Çalışma kaydı başarıyla eklendi!', 'success')
+
+            # Streak durumuna göre ek mesajlar
+            if streak_result.get('same_day'):
+                flash(f'Bugün için zaten çalışma kaydın var. Streak {streak_result.get("new_streak")} günde sabit kaldı.', 'info')
+            elif streak_result.get('streak_increased'):
+                flash(f'🔥 Harika! Streak\'in {streak_result.get("new_streak")} güne çıktı!', 'success')
+            elif streak_result.get('broken'):
+                flash(f'Streak kırıldı. Yeni başlangıç: {streak_result.get("new_streak")} gün. Vazgeçme! 💪', 'warning')
+
             return redirect(url_for('dashboard'))
             
         except Exception as e:
@@ -976,7 +1216,10 @@ def admin_add_study(student_id):
             ''')
             c.execute(query, (student_id, date, subject, hours, efficiency, notes, difficulties))
             conn.commit()
-            
+
+            # Streak'i güncelle
+            update_streak(student_id, date)
+
             return jsonify({'success': True, 'message': 'Çalışma kaydı başarıyla eklendi!'})
         
     except Exception as e:
