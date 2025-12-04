@@ -2160,18 +2160,17 @@ body {
 .leaderboard-header h1 {
     font-size: 3rem;
     font-weight: 800;
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #ffffff;
     margin-bottom: 0.5rem;
-    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .leaderboard-header .subtitle {
     font-size: 1.1rem;
-    color: var(--gray);
+    color: #ffffff;
     font-weight: 500;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    opacity: 0.95;
 }
 
 /* Leaderboard Filters */
@@ -2243,6 +2242,12 @@ body {
 .leaderboard-title p {
     color: var(--gray);
     font-size: 1rem;
+}
+
+/* Leaderboard header text - beyaz renk */
+.leaderboard-header h1,
+.leaderboard-header .subtitle {
+    color: #ffffff !important;
 }
 
 /* Leaderboard Items */
