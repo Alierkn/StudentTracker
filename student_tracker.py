@@ -584,6 +584,103 @@ def api_stats():
         'efficiency_trend': [{'date': row['date'], 'efficiency': float(row['avg_efficiency']) if row['avg_efficiency'] else 0} for row in efficiency_trend]
     })
 
+@app.route('/update-study/<int:session_id>', methods=['POST'])
+@login_required
+def update_study(session_id):
+    """Çalışma kaydı güncelle"""
+    try:
+        data = request.get_json()
+        
+        # Veri doğrulama
+        date = data.get('date')
+        subject = data.get('subject')
+        hours = data.get('hours')
+        efficiency = data.get('efficiency')
+        notes = data.get('notes', '')
+        difficulties = data.get('difficulties', '')
+        
+        if not date or not subject or hours is None or efficiency is None:
+            return jsonify({'success': False, 'error': 'Tüm zorunlu alanlar doldurulmalı!'}), 400
+        
+        hours = float(hours)
+        efficiency = int(efficiency)
+        
+        if hours <= 0 or hours > 24:
+            return jsonify({'success': False, 'error': 'Saat 0-24 arasında olmalı!'}), 400
+        
+        if efficiency < 0 or efficiency > 100:
+            return jsonify({'success': False, 'error': 'Verimlilik 0-100 arasında olmalı!'}), 400
+        
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Önce kaydın bu öğrenciye ait olduğunu kontrol et
+            query = adapt_query('SELECT student_id FROM study_sessions WHERE id = ?')
+            c.execute(query, (session_id,))
+            study_record = c.fetchone()
+            
+            if not study_record:
+                return jsonify({'success': False, 'error': 'Kayıt bulunamadı'}), 404
+            
+            if study_record['student_id'] != session.get('user_id'):
+                return jsonify({'success': False, 'error': 'Bu kaydı güncelleme yetkiniz yok'}), 403
+            
+            # Kaydı güncelle
+            query = adapt_query('''
+                UPDATE study_sessions 
+                SET date = ?, subject = ?, hours = ?, efficiency = ?, notes = ?, difficulties = ?
+                WHERE id = ? AND student_id = ?
+            ''')
+            c.execute(query, (date, subject, hours, efficiency, notes, difficulties, session_id, session.get('user_id')))
+            conn.commit()
+            
+            if c.rowcount > 0:
+                return jsonify({'success': True, 'message': 'Çalışma kaydı başarıyla güncellendi!'})
+            else:
+                return jsonify({'success': False, 'error': 'Kayıt güncellenemedi!'}), 500
+        
+    except Exception as e:
+        import traceback
+        print(f"HATA: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/get-study/<int:session_id>', methods=['GET'])
+@login_required
+def get_study(session_id):
+    """Çalışma kaydı bilgilerini getir"""
+    try:
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Önce kaydın bu öğrenciye ait olduğunu kontrol et
+            query = adapt_query('SELECT * FROM study_sessions WHERE id = ?')
+            c.execute(query, (session_id,))
+            study_record = c.fetchone()
+            
+            if not study_record:
+                return jsonify({'success': False, 'error': 'Kayıt bulunamadı'}), 404
+            
+            if study_record['student_id'] != session.get('user_id'):
+                return jsonify({'success': False, 'error': 'Bu kaydı görüntüleme yetkiniz yok'}), 403
+            
+            # Veriyi döndür
+            return jsonify({
+                'success': True,
+                'data': {
+                    'id': study_record['id'],
+                    'date': study_record['date'],
+                    'subject': study_record['subject'],
+                    'hours': study_record['hours'],
+                    'efficiency': study_record['efficiency'],
+                    'notes': study_record['notes'] or '',
+                    'difficulties': study_record['difficulties'] or ''
+                }
+            })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/delete-study/<int:session_id>', methods=['POST'])
 @login_required
 def delete_study(session_id):
@@ -720,6 +817,268 @@ def admin_student_detail(student_id):
         exams = c.fetchall()
     
     return render_template('admin_student_detail.html', student=student, sessions=sessions, exams=exams)
+
+@app.route('/admin/study/<int:session_id>/update', methods=['POST'])
+@admin_required
+def admin_update_study(session_id):
+    """Admin - çalışma kaydı güncelle"""
+    try:
+        data = request.get_json()
+        
+        # Veri doğrulama
+        date = data.get('date')
+        subject = data.get('subject')
+        hours = data.get('hours')
+        efficiency = data.get('efficiency')
+        notes = data.get('notes', '')
+        difficulties = data.get('difficulties', '')
+        
+        if not date or not subject or hours is None or efficiency is None:
+            return jsonify({'success': False, 'error': 'Tüm zorunlu alanlar doldurulmalı!'}), 400
+        
+        hours = float(hours)
+        efficiency = int(efficiency)
+        
+        if hours <= 0 or hours > 24:
+            return jsonify({'success': False, 'error': 'Saat 0-24 arasında olmalı!'}), 400
+        
+        if efficiency < 0 or efficiency > 100:
+            return jsonify({'success': False, 'error': 'Verimlilik 0-100 arasında olmalı!'}), 400
+        
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Kaydın var olduğunu kontrol et
+            query = adapt_query('SELECT id FROM study_sessions WHERE id = ?')
+            c.execute(query, (session_id,))
+            if not c.fetchone():
+                return jsonify({'success': False, 'error': 'Kayıt bulunamadı'}), 404
+            
+            # Kaydı güncelle
+            query = adapt_query('''
+                UPDATE study_sessions 
+                SET date = ?, subject = ?, hours = ?, efficiency = ?, notes = ?, difficulties = ?
+                WHERE id = ?
+            ''')
+            c.execute(query, (date, subject, hours, efficiency, notes, difficulties, session_id))
+            conn.commit()
+            
+            if c.rowcount > 0:
+                return jsonify({'success': True, 'message': 'Çalışma kaydı başarıyla güncellendi!'})
+            else:
+                return jsonify({'success': False, 'error': 'Kayıt güncellenemedi!'}), 500
+        
+    except Exception as e:
+        import traceback
+        print(f"HATA: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/study/<int:session_id>', methods=['GET'])
+@admin_required
+def admin_get_study(session_id):
+    """Admin - çalışma kaydı bilgilerini getir"""
+    try:
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            query = adapt_query('SELECT * FROM study_sessions WHERE id = ?')
+            c.execute(query, (session_id,))
+            study_record = c.fetchone()
+            
+            if not study_record:
+                return jsonify({'success': False, 'error': 'Kayıt bulunamadı'}), 404
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'id': study_record['id'],
+                    'date': study_record['date'],
+                    'subject': study_record['subject'],
+                    'hours': study_record['hours'],
+                    'efficiency': study_record['efficiency'],
+                    'notes': study_record['notes'] or '',
+                    'difficulties': study_record['difficulties'] or ''
+                }
+            })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/student/<int:student_id>/study/add', methods=['POST'])
+@admin_required
+def admin_add_study(student_id):
+    """Admin - öğrenciye çalışma kaydı ekle"""
+    try:
+        data = request.get_json()
+        
+        # Veri doğrulama
+        date = data.get('date')
+        subject = data.get('subject')
+        hours = data.get('hours')
+        efficiency = data.get('efficiency')
+        notes = data.get('notes', '')
+        difficulties = data.get('difficulties', '')
+        
+        if not date or not subject or hours is None or efficiency is None:
+            return jsonify({'success': False, 'error': 'Tüm zorunlu alanlar doldurulmalı!'}), 400
+        
+        hours = float(hours)
+        efficiency = int(efficiency)
+        
+        if hours <= 0 or hours > 24:
+            return jsonify({'success': False, 'error': 'Saat 0-24 arasında olmalı!'}), 400
+        
+        if efficiency < 0 or efficiency > 100:
+            return jsonify({'success': False, 'error': 'Verimlilik 0-100 arasında olmalı!'}), 400
+        
+        # Öğrencinin var olduğunu kontrol et
+        with get_db() as conn:
+            c = get_cursor(conn)
+            query = adapt_query('SELECT id FROM students WHERE id = ?')
+            c.execute(query, (student_id,))
+            if not c.fetchone():
+                return jsonify({'success': False, 'error': 'Öğrenci bulunamadı'}), 404
+            
+            # Çalışma kaydı ekle
+            query = adapt_query('''
+                INSERT INTO study_sessions (student_id, date, subject, hours, efficiency, notes, difficulties)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''')
+            c.execute(query, (student_id, date, subject, hours, efficiency, notes, difficulties))
+            conn.commit()
+            
+            return jsonify({'success': True, 'message': 'Çalışma kaydı başarıyla eklendi!'})
+        
+    except Exception as e:
+        import traceback
+        print(f"HATA: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/exam/<int:exam_id>/update', methods=['POST'])
+@admin_required
+def admin_update_exam(exam_id):
+    """Admin - sınav sonucu güncelle"""
+    try:
+        data = request.get_json()
+        
+        exam_name = data.get('exam_name')
+        score = data.get('score')
+        max_score = data.get('max_score', 100)
+        exam_date = data.get('exam_date', '')
+        
+        if not exam_name or score is None:
+            return jsonify({'success': False, 'error': 'Tüm zorunlu alanlar doldurulmalı!'}), 400
+        
+        score = float(score)
+        max_score = float(max_score)
+        
+        if score < 0 or max_score <= 0:
+            return jsonify({'success': False, 'error': 'Notlar geçerli olmalı!'}), 400
+        
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Kaydın var olduğunu kontrol et
+            query = adapt_query('SELECT id FROM exam_results WHERE id = ?')
+            c.execute(query, (exam_id,))
+            if not c.fetchone():
+                return jsonify({'success': False, 'error': 'Kayıt bulunamadı'}), 404
+            
+            # Kaydı güncelle
+            query = adapt_query('''
+                UPDATE exam_results 
+                SET exam_name = ?, score = ?, max_score = ?, exam_date = ?
+                WHERE id = ?
+            ''')
+            c.execute(query, (exam_name, score, max_score, exam_date if exam_date else None, exam_id))
+            conn.commit()
+            
+            if c.rowcount > 0:
+                return jsonify({'success': True, 'message': 'Sınav sonucu başarıyla güncellendi!'})
+            else:
+                return jsonify({'success': False, 'error': 'Kayıt güncellenemedi!'}), 500
+        
+    except Exception as e:
+        import traceback
+        print(f"HATA: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/exam/<int:exam_id>', methods=['GET'])
+@admin_required
+def admin_get_exam(exam_id):
+    """Admin - sınav sonucu bilgilerini getir"""
+    try:
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            query = adapt_query('SELECT * FROM exam_results WHERE id = ?')
+            c.execute(query, (exam_id,))
+            exam_record = c.fetchone()
+            
+            if not exam_record:
+                return jsonify({'success': False, 'error': 'Kayıt bulunamadı'}), 404
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'id': exam_record['id'],
+                    'exam_name': exam_record['exam_name'],
+                    'score': exam_record['score'],
+                    'max_score': exam_record['max_score'],
+                    'exam_date': exam_record['exam_date'] or ''
+                }
+            })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/student/<int:student_id>/exam/add', methods=['POST'])
+@admin_required
+def admin_add_exam(student_id):
+    """Admin - öğrenciye sınav sonucu ekle"""
+    try:
+        data = request.get_json()
+        
+        exam_name = data.get('exam_name')
+        score = data.get('score')
+        max_score = data.get('max_score', 100)
+        exam_date = data.get('exam_date', '')
+        
+        if not exam_name or score is None:
+            return jsonify({'success': False, 'error': 'Tüm zorunlu alanlar doldurulmalı!'}), 400
+        
+        score = float(score)
+        max_score = float(max_score)
+        
+        if score < 0 or max_score <= 0:
+            return jsonify({'success': False, 'error': 'Notlar geçerli olmalı!'}), 400
+        
+        # Öğrencinin var olduğunu kontrol et
+        with get_db() as conn:
+            c = get_cursor(conn)
+            query = adapt_query('SELECT id FROM students WHERE id = ?')
+            c.execute(query, (student_id,))
+            if not c.fetchone():
+                return jsonify({'success': False, 'error': 'Öğrenci bulunamadı'}), 404
+            
+            # Sınav sonucu ekle
+            query = adapt_query('''
+                INSERT INTO exam_results (student_id, exam_name, score, max_score, exam_date)
+                VALUES (?, ?, ?, ?, ?)
+            ''')
+            c.execute(query, (student_id, exam_name, score, max_score, exam_date if exam_date else None))
+            conn.commit()
+            
+            return jsonify({'success': True, 'message': 'Sınav sonucu başarıyla eklendi!'})
+        
+    except Exception as e:
+        import traceback
+        print(f"HATA: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/admin/student/<int:student_id>/delete', methods=['POST'])
 @admin_required
@@ -962,6 +1321,55 @@ def update_schedule(schedule_id):
         print(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/admin/schedule/<int:student_id>/data')
+@admin_required
+def admin_get_schedule_data(student_id):
+    """Admin - öğrenci ders programı verilerini getir"""
+    try:
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Öğrencinin aktif programını bul
+            query = adapt_query('SELECT * FROM schedules WHERE student_id = ? ORDER BY created_at DESC LIMIT 1')
+            c.execute(query, (student_id,))
+            schedule = c.fetchone()
+            
+            if not schedule:
+                return jsonify({'success': True, 'schedule': None, 'items': []})
+            
+            # Program öğelerini al
+            query = adapt_query('SELECT * FROM schedule_items WHERE schedule_id = ? ORDER BY day_of_week, start_time')
+            c.execute(query, (schedule['id'],))
+            items = c.fetchall()
+            
+            # Items'ı dict formatına çevir
+            items_list = []
+            for item in items:
+                items_list.append({
+                    'day_of_week': item['day_of_week'],
+                    'start_time': item['start_time'],
+                    'end_time': item['end_time'],
+                    'subject': item['subject'],
+                    'location': item['location'] or '',
+                    'instructor': item['instructor'] or ''
+                })
+            
+            return jsonify({
+                'success': True,
+                'schedule': {
+                    'id': schedule['id'],
+                    'name': schedule['name'],
+                    'description': schedule['description'] or ''
+                },
+                'items': items_list
+            })
+    
+    except Exception as e:
+        import traceback
+        print(f"HATA: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/schedule/<int:schedule_id>/data')
 @login_required
 def get_schedule_data(schedule_id):
@@ -1112,6 +1520,94 @@ def complete_schedule_item(item_id):
             conn.commit()
         
         return jsonify({'success': True})
+    except Exception as e:
+        import traceback
+        print(f"HATA: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/schedule/<int:student_id>/update', methods=['POST'])
+@admin_required
+def admin_update_schedule(student_id):
+    """Admin - öğrenci ders programını güncelle"""
+    try:
+        data = request.get_json()
+        
+        name = data.get('name')
+        description = data.get('description', '')
+        items = data.get('items', [])
+        
+        if not name:
+            return jsonify({'success': False, 'error': 'Program adı gereklidir!'}), 400
+        
+        with get_db() as conn:
+            c = get_cursor(conn)
+            
+            # Öğrencinin var olduğunu kontrol et
+            query = adapt_query('SELECT id FROM students WHERE id = ?')
+            c.execute(query, (student_id,))
+            if not c.fetchone():
+                return jsonify({'success': False, 'error': 'Öğrenci bulunamadı'}), 404
+            
+            # Öğrencinin aktif programını bul
+            query = adapt_query('SELECT id FROM schedules WHERE student_id = ? ORDER BY created_at DESC LIMIT 1')
+            c.execute(query, (student_id,))
+            schedule = c.fetchone()
+            
+            schedule_id = None
+            if schedule:
+                schedule_id = schedule['id']
+                # Mevcut programı güncelle
+                query = adapt_query('''
+                    UPDATE schedules 
+                    SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''')
+                c.execute(query, (name, description, schedule_id))
+                
+                # Eski öğeleri sil
+                query = adapt_query('DELETE FROM schedule_items WHERE schedule_id = ?')
+                c.execute(query, (schedule_id,))
+            else:
+                # Yeni program oluştur
+                query = adapt_query('''
+                    INSERT INTO schedules (student_id, name, description)
+                    VALUES (?, ?, ?)
+                ''')
+                c.execute(query, (student_id, name, description))
+                
+                # Yeni oluşturulan program ID'sini al
+                if USE_SUPABASE:
+                    from psycopg2.extras import RealDictCursor
+                    c2 = conn.cursor(cursor_factory=RealDictCursor)
+                    c2.execute('SELECT LASTVAL() as lastval')
+                    result = c2.fetchone()
+                    schedule_id = result['lastval']
+                    c2.close()
+                else:
+                    c.execute('SELECT last_insert_rowid()')
+                    schedule_id = c.fetchone()[0]
+            
+            # Yeni öğeleri ekle
+            for item in items:
+                query = adapt_query('''
+                    INSERT INTO schedule_items 
+                    (schedule_id, day_of_week, start_time, end_time, subject, location, instructor)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''')
+                c.execute(query, (
+                    schedule_id,
+                    int(item.get('day_of_week', 0)),
+                    item.get('start_time', ''),
+                    item.get('end_time', ''),
+                    item.get('subject', ''),
+                    item.get('location', ''),
+                    item.get('instructor', '')
+                ))
+            
+            conn.commit()
+        
+        return jsonify({'success': True, 'message': 'Ders programı başarıyla güncellendi!'})
     except Exception as e:
         import traceback
         print(f"HATA: {str(e)}")

@@ -19,7 +19,10 @@
     <div class="detail-sections">
         <!-- Çalışma Kayıtları -->
         <div class="detail-section">
-            <h2>📖 Çalışma Kayıtları</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2>📖 Çalışma Kayıtları</h2>
+                <button onclick="addStudySession({{ student.id }})" class="btn btn-primary btn-sm">+ Çalışma Kaydı Ekle</button>
+            </div>
             <div class="table-container">
                 <table class="data-table">
                     <thead>
@@ -30,6 +33,7 @@
                             <th>Verimlilik</th>
                             <th>Notlar</th>
                             <th>Zorluklar</th>
+                            <th>İşlem</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -46,11 +50,18 @@
                                 </td>
                                 <td>{{ session.notes[:50] if session.notes else '-' }}{{ '...' if session.notes and session.notes|length > 50 else '' }}</td>
                                 <td>{{ session.difficulties[:50] if session.difficulties else '-' }}{{ '...' if session.difficulties and session.difficulties|length > 50 else '' }}</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button onclick="editStudySession({{ session.id }})" class="btn-edit" title="Düzenle">
+                                            ✏️
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="6" class="empty-state">Henüz çalışma kaydı yok</td>
+                                <td colspan="7" class="empty-state">Henüz çalışma kaydı yok</td>
                             </tr>
                         {% endif %}
                     </tbody>
@@ -60,7 +71,10 @@
 
         <!-- Sınav Sonuçları -->
         <div class="detail-section">
-            <h2>📝 Sınav Sonuçları</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2>📝 Sınav Sonuçları</h2>
+                <button onclick="addExam({{ student.id }})" class="btn btn-primary btn-sm">+ Sınav Sonucu Ekle</button>
+            </div>
             <div class="table-container">
                 <table class="data-table">
                     <thead>
@@ -70,6 +84,7 @@
                             <th>Maksimum</th>
                             <th>Yüzde</th>
                             <th>Tarih</th>
+                            <th>İşlem</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -85,11 +100,18 @@
                                     </span>
                                 </td>
                                 <td>{{ exam.exam_date or '-' }}</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button onclick="editExam({{ exam.id }})" class="btn-edit" title="Düzenle">
+                                            ✏️
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="5" class="empty-state">Henüz sınav sonucu yok</td>
+                                <td colspan="6" class="empty-state">Henüz sınav sonucu yok</td>
                             </tr>
                         {% endif %}
                     </tbody>
@@ -98,10 +120,198 @@
         </div>
     </div>
 </div>
+
+<!-- Çalışma Kaydı Düzenleme Modal -->
+<div id="editStudyModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>✏️ Çalışma Kaydını Düzenle</h2>
+            <span class="close" onclick="closeEditStudyModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form onsubmit="event.preventDefault(); updateStudySession();">
+                <input type="hidden" id="editStudySessionId">
+                
+                <div class="form-group">
+                    <label for="editStudyDate">Tarih *</label>
+                    <input type="date" id="editStudyDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="editStudySubject">Ders/Konu *</label>
+                    <input type="text" id="editStudySubject" required placeholder="Örn: Matematik, Fizik, Kimya...">
+                </div>
+
+                <div class="form-group">
+                    <label for="editStudyHours">Çalışma Süresi (Saat) *</label>
+                    <input type="number" id="editStudyHours" min="0.1" max="24" step="0.1" required placeholder="Örn: 2.5">
+                </div>
+
+                <div class="form-group">
+                    <label for="editStudyEfficiency">Verimlilik (%) *</label>
+                    <input type="range" id="editStudyEfficiency" min="0" max="100" value="50" oninput="updateEditStudyEfficiencyValue(this.value)" required>
+                    <div class="range-display">
+                        <span id="editStudyEfficiencyValue">50</span>%
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="editStudyNotes">Notlar (Opsiyonel)</label>
+                    <textarea id="editStudyNotes" rows="4" placeholder="Çalıştığınız konular, önemli noktalar..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="editStudyDifficulties">Anlamadığınız Yerler (Opsiyonel)</label>
+                    <textarea id="editStudyDifficulties" rows="3" placeholder="Anlamadığınız veya zorlandığınız konular..."></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Güncelle</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEditStudyModal()">İptal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Çalışma Kaydı Ekleme Modal -->
+<div id="addStudyModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>➕ Çalışma Kaydı Ekle</h2>
+            <span class="close" onclick="closeAddStudyModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form onsubmit="event.preventDefault(); submitAddStudy();">
+                <input type="hidden" id="addStudyStudentId">
+                
+                <div class="form-group">
+                    <label for="addStudyDate">Tarih *</label>
+                    <input type="date" id="addStudyDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="addStudySubject">Ders/Konu *</label>
+                    <input type="text" id="addStudySubject" required placeholder="Örn: Matematik, Fizik, Kimya...">
+                </div>
+
+                <div class="form-group">
+                    <label for="addStudyHours">Çalışma Süresi (Saat) *</label>
+                    <input type="number" id="addStudyHours" min="0.1" max="24" step="0.1" required placeholder="Örn: 2.5">
+                </div>
+
+                <div class="form-group">
+                    <label for="addStudyEfficiency">Verimlilik (%) *</label>
+                    <input type="range" id="addStudyEfficiency" min="0" max="100" value="50" oninput="updateAddStudyEfficiencyValue(this.value)" required>
+                    <div class="range-display">
+                        <span id="addStudyEfficiencyValue">50</span>%
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="addStudyNotes">Notlar (Opsiyonel)</label>
+                    <textarea id="addStudyNotes" rows="4" placeholder="Çalıştığınız konular, önemli noktalar..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="addStudyDifficulties">Anlamadığınız Yerler (Opsiyonel)</label>
+                    <textarea id="addStudyDifficulties" rows="3" placeholder="Anlamadığınız veya zorlandığınız konular..."></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Ekle</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeAddStudyModal()">İptal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Sınav Sonucu Düzenleme Modal -->
+<div id="editExamModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>✏️ Sınav Sonucunu Düzenle</h2>
+            <span class="close" onclick="closeEditExamModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form onsubmit="event.preventDefault(); updateExam();">
+                <input type="hidden" id="editExamId">
+                
+                <div class="form-group">
+                    <label for="editExamName">Sınav Adı *</label>
+                    <input type="text" id="editExamName" required placeholder="Örn: Matematik Vize 1, Fizik Final...">
+                </div>
+
+                <div class="form-group">
+                    <label for="editExamScore">Aldığı Not *</label>
+                    <input type="number" id="editExamScore" min="0" step="0.1" required placeholder="Örn: 85">
+                </div>
+
+                <div class="form-group">
+                    <label for="editExamMaxScore">Maksimum Not</label>
+                    <input type="number" id="editExamMaxScore" min="1" value="100" step="0.1" placeholder="100">
+                </div>
+
+                <div class="form-group">
+                    <label for="editExamDate">Sınav Tarihi</label>
+                    <input type="date" id="editExamDate">
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Güncelle</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEditExamModal()">İptal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Sınav Sonucu Ekleme Modal -->
+<div id="addExamModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>➕ Sınav Sonucu Ekle</h2>
+            <span class="close" onclick="closeAddExamModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form onsubmit="event.preventDefault(); submitAddExam();">
+                <input type="hidden" id="addExamStudentId">
+                
+                <div class="form-group">
+                    <label for="addExamName">Sınav Adı *</label>
+                    <input type="text" id="addExamName" required placeholder="Örn: Matematik Vize 1, Fizik Final...">
+                </div>
+
+                <div class="form-group">
+                    <label for="addExamScore">Aldığı Not *</label>
+                    <input type="number" id="addExamScore" min="0" step="0.1" required placeholder="Örn: 85">
+                </div>
+
+                <div class="form-group">
+                    <label for="addExamMaxScore">Maksimum Not</label>
+                    <input type="number" id="addExamMaxScore" min="1" value="100" step="0.1" placeholder="100">
+                </div>
+
+                <div class="form-group">
+                    <label for="addExamDate">Sınav Tarihi</label>
+                    <input type="date" id="addExamDate">
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Ekle</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeAddExamModal()">İptal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+    const studentId = {{ student.id }};
+
     function deleteStudent(studentId, username) {
         if (!confirm(`"${username}" kullanıcısını silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz! Öğrencinin tüm çalışma kayıtları, sınav sonuçları ve ders programları da silinecektir.`)) {
             return;
@@ -125,6 +335,252 @@
         .catch(error => {
             console.error('Silme hatası:', error);
             alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+        });
+    }
+
+    // Çalışma kaydı düzenle
+    function editStudySession(id) {
+        fetch(`/admin/study/${id}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const study = data.data;
+                    document.getElementById('editStudySessionId').value = study.id;
+                    document.getElementById('editStudyDate').value = study.date;
+                    document.getElementById('editStudySubject').value = study.subject;
+                    document.getElementById('editStudyHours').value = study.hours;
+                    document.getElementById('editStudyEfficiency').value = study.efficiency;
+                    document.getElementById('editStudyEfficiencyValue').textContent = study.efficiency;
+                    document.getElementById('editStudyNotes').value = study.notes || '';
+                    document.getElementById('editStudyDifficulties').value = study.difficulties || '';
+                    document.getElementById('editStudyModal').style.display = 'flex';
+                } else {
+                    alert('Kayıt bilgileri alınamadı: ' + (data.error || 'Bilinmeyen hata'));
+                }
+            })
+            .catch(error => {
+                console.error('Hata:', error);
+                alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+            });
+    }
+
+    // Çalışma kaydı ekle
+    function addStudySession(studentId) {
+        document.getElementById('addStudyStudentId').value = studentId;
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('addStudyDate').value = today;
+        document.getElementById('addStudySubject').value = '';
+        document.getElementById('addStudyHours').value = '';
+        document.getElementById('addStudyEfficiency').value = 50;
+        document.getElementById('addStudyEfficiencyValue').textContent = 50;
+        document.getElementById('addStudyNotes').value = '';
+        document.getElementById('addStudyDifficulties').value = '';
+        document.getElementById('addStudyModal').style.display = 'flex';
+    }
+
+    // Çalışma kaydı güncelle
+    function updateStudySession() {
+        const id = document.getElementById('editStudySessionId').value;
+        const formData = {
+            date: document.getElementById('editStudyDate').value,
+            subject: document.getElementById('editStudySubject').value,
+            hours: parseFloat(document.getElementById('editStudyHours').value),
+            efficiency: parseInt(document.getElementById('editStudyEfficiency').value),
+            notes: document.getElementById('editStudyNotes').value,
+            difficulties: document.getElementById('editStudyDifficulties').value
+        };
+
+        fetch(`/admin/study/${id}/update`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Çalışma kaydı başarıyla güncellendi!');
+                document.getElementById('editStudyModal').style.display = 'none';
+                location.reload();
+            } else {
+                alert('Güncelleme başarısız: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(error => {
+            console.error('Güncelleme hatası:', error);
+            alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+        });
+    }
+
+    // Çalışma kaydı ekle (submit)
+    function submitAddStudy() {
+        const studentId = document.getElementById('addStudyStudentId').value;
+        const formData = {
+            date: document.getElementById('addStudyDate').value,
+            subject: document.getElementById('addStudySubject').value,
+            hours: parseFloat(document.getElementById('addStudyHours').value),
+            efficiency: parseInt(document.getElementById('addStudyEfficiency').value),
+            notes: document.getElementById('addStudyNotes').value,
+            difficulties: document.getElementById('addStudyDifficulties').value
+        };
+
+        fetch(`/admin/student/${studentId}/study/add`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Çalışma kaydı başarıyla eklendi!');
+                document.getElementById('addStudyModal').style.display = 'none';
+                location.reload();
+            } else {
+                alert('Ekleme başarısız: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(error => {
+            console.error('Ekleme hatası:', error);
+            alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+        });
+    }
+
+    // Sınav sonucu düzenle
+    function editExam(id) {
+        fetch(`/admin/exam/${id}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const exam = data.data;
+                    document.getElementById('editExamId').value = exam.id;
+                    document.getElementById('editExamName').value = exam.exam_name;
+                    document.getElementById('editExamScore').value = exam.score;
+                    document.getElementById('editExamMaxScore').value = exam.max_score;
+                    document.getElementById('editExamDate').value = exam.exam_date || '';
+                    document.getElementById('editExamModal').style.display = 'flex';
+                } else {
+                    alert('Kayıt bilgileri alınamadı: ' + (data.error || 'Bilinmeyen hata'));
+                }
+            })
+            .catch(error => {
+                console.error('Hata:', error);
+                alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+            });
+    }
+
+    // Sınav sonucu ekle
+    function addExam(studentId) {
+        document.getElementById('addExamStudentId').value = studentId;
+        document.getElementById('addExamName').value = '';
+        document.getElementById('addExamScore').value = '';
+        document.getElementById('addExamMaxScore').value = 100;
+        document.getElementById('addExamDate').value = '';
+        document.getElementById('addExamModal').style.display = 'flex';
+    }
+
+    // Sınav sonucu güncelle
+    function updateExam() {
+        const id = document.getElementById('editExamId').value;
+        const formData = {
+            exam_name: document.getElementById('editExamName').value,
+            score: parseFloat(document.getElementById('editExamScore').value),
+            max_score: parseFloat(document.getElementById('editExamMaxScore').value),
+            exam_date: document.getElementById('editExamDate').value
+        };
+
+        fetch(`/admin/exam/${id}/update`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Sınav sonucu başarıyla güncellendi!');
+                document.getElementById('editExamModal').style.display = 'none';
+                location.reload();
+            } else {
+                alert('Güncelleme başarısız: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(error => {
+            console.error('Güncelleme hatası:', error);
+            alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+        });
+    }
+
+    // Sınav sonucu ekle (submit)
+    function submitAddExam() {
+        const studentId = document.getElementById('addExamStudentId').value;
+        const formData = {
+            exam_name: document.getElementById('addExamName').value,
+            score: parseFloat(document.getElementById('addExamScore').value),
+            max_score: parseFloat(document.getElementById('addExamMaxScore').value),
+            exam_date: document.getElementById('addExamDate').value
+        };
+
+        fetch(`/admin/student/${studentId}/exam/add`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Sınav sonucu başarıyla eklendi!');
+                document.getElementById('addExamModal').style.display = 'none';
+                location.reload();
+            } else {
+                alert('Ekleme başarısız: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(error => {
+            console.error('Ekleme hatası:', error);
+            alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+        });
+    }
+
+    // Modal kapatma fonksiyonları
+    function closeEditStudyModal() {
+        document.getElementById('editStudyModal').style.display = 'none';
+    }
+
+    function closeAddStudyModal() {
+        document.getElementById('addStudyModal').style.display = 'none';
+    }
+
+    function closeEditExamModal() {
+        document.getElementById('editExamModal').style.display = 'none';
+    }
+
+    function closeAddExamModal() {
+        document.getElementById('addExamModal').style.display = 'none';
+    }
+
+    // Verimlilik değerini güncelle
+    function updateEditStudyEfficiencyValue(value) {
+        document.getElementById('editStudyEfficiencyValue').textContent = value;
+    }
+
+    function updateAddStudyEfficiencyValue(value) {
+        document.getElementById('addStudyEfficiencyValue').textContent = value;
+    }
+
+    // Modal dışına tıklanınca kapat
+    window.onclick = function(event) {
+        const modals = ['editStudyModal', 'addStudyModal', 'editExamModal', 'addExamModal'];
+        modals.forEach(modalId => {
+            const modal = document.getElementById(modalId);
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
         });
     }
 </script>

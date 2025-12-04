@@ -7,7 +7,14 @@
     <div class="admin-schedule-header">
         <h1>📅 {{ student.full_name }} - Ders Programı</h1>
         <p class="subtitle">Öğrenci: {{ student.username }}</p>
-        <a href="{{ url_for('admin_student_detail', student_id=student.id) }}" class="btn btn-secondary">← Öğrenci Detayına Dön</a>
+        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+            <a href="{{ url_for('admin_student_detail', student_id=student.id) }}" class="btn btn-secondary">← Öğrenci Detayına Dön</a>
+            {% if active_schedule %}
+            <button onclick="editSchedule({{ student.id }}, {{ active_schedule.id }})" class="btn btn-primary">✏️ Ders Programını Düzenle</button>
+            {% else %}
+            <button onclick="createSchedule({{ student.id }})" class="btn btn-primary">➕ Ders Programı Oluştur</button>
+            {% endif %}
+        </div>
     </div>
 
     {% if active_schedule %}
@@ -95,5 +102,194 @@
     {% endif %}
 </div>
 
+<!-- Ders Programı Modal -->
+<div id="scheduleModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2 id="scheduleModalTitle">Yeni Ders Programı Oluştur</h2>
+            <span class="close" onclick="closeScheduleModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="scheduleForm">
+                <div class="form-group">
+                    <label for="scheduleName">Program Adı *</label>
+                    <input type="text" id="scheduleName" name="name" required placeholder="Örn: 2024-2025 Güz Dönemi">
+                </div>
+                
+                <div class="form-group">
+                    <label for="scheduleDescription">Açıklama</label>
+                    <textarea id="scheduleDescription" name="description" rows="3" placeholder="Program hakkında notlar..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <h3>Dersler</h3>
+                    <div id="scheduleItems">
+                        <!-- Dersler buraya eklenecek -->
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="addScheduleItem()">+ Ders Ekle</button>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeScheduleModal()">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let scheduleItems = [];
+    const days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+    const studentId = {{ student.id }};
+
+    function createSchedule(studentId) {
+        scheduleItems = [];
+        document.getElementById('scheduleModalTitle').textContent = 'Yeni Ders Programı Oluştur';
+        document.getElementById('scheduleName').value = '';
+        document.getElementById('scheduleDescription').value = '';
+        renderScheduleItems();
+        document.getElementById('scheduleModal').style.display = 'block';
+    }
+
+    function editSchedule(studentId, scheduleId) {
+        document.getElementById('scheduleModalTitle').textContent = 'Ders Programını Düzenle';
+        
+        fetch(`/admin/schedule/${studentId}/data`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.schedule) {
+                        document.getElementById('scheduleName').value = data.schedule.name;
+                        document.getElementById('scheduleDescription').value = data.schedule.description || '';
+                        scheduleItems = data.items || [];
+                    } else {
+                        scheduleItems = [];
+                    }
+                    renderScheduleItems();
+                    document.getElementById('scheduleModal').style.display = 'block';
+                } else {
+                    alert('Program bilgileri yüklenirken hata oluştu');
+                }
+            })
+            .catch(err => {
+                console.error('Hata:', err);
+                alert('Program bilgileri yüklenirken hata oluştu');
+            });
+    }
+
+    function closeScheduleModal() {
+        document.getElementById('scheduleModal').style.display = 'none';
+    }
+
+    function addScheduleItem() {
+        scheduleItems.push({
+            day_of_week: 0,
+            start_time: '09:00',
+            end_time: '10:00',
+            subject: '',
+            location: '',
+            instructor: ''
+        });
+        renderScheduleItems();
+    }
+
+    function removeScheduleItem(index) {
+        scheduleItems.splice(index, 1);
+        renderScheduleItems();
+    }
+
+    function renderScheduleItems() {
+        const container = document.getElementById('scheduleItems');
+        container.innerHTML = '';
+        
+        scheduleItems.forEach((item, index) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'schedule-item-form';
+            itemDiv.innerHTML = `
+                <div class="item-form-row">
+                    <div class="form-group-inline">
+                        <label>Gün</label>
+                        <select onchange="scheduleItems[${index}].day_of_week = parseInt(this.value)">
+                            ${days.map((day, i) => `<option value="${i}" ${item.day_of_week === i ? 'selected' : ''}>${day}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group-inline">
+                        <label>Başlangıç</label>
+                        <input type="time" value="${item.start_time}" onchange="scheduleItems[${index}].start_time = this.value">
+                    </div>
+                    <div class="form-group-inline">
+                        <label>Bitiş</label>
+                        <input type="time" value="${item.end_time}" onchange="scheduleItems[${index}].end_time = this.value">
+                    </div>
+                </div>
+                <div class="item-form-row">
+                    <div class="form-group-inline full-width">
+                        <label>Ders Adı *</label>
+                        <input type="text" value="${item.subject}" required onchange="scheduleItems[${index}].subject = this.value" placeholder="Örn: Matematik">
+                    </div>
+                </div>
+                <div class="item-form-row">
+                    <div class="form-group-inline">
+                        <label>Yer</label>
+                        <input type="text" value="${item.location || ''}" onchange="scheduleItems[${index}].location = this.value" placeholder="Örn: A-101">
+                    </div>
+                    <div class="form-group-inline">
+                        <label>Öğretmen</label>
+                        <input type="text" value="${item.instructor || ''}" onchange="scheduleItems[${index}].instructor = this.value" placeholder="Örn: Ahmet Yılmaz">
+                    </div>
+                </div>
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeScheduleItem(${index})">Sil</button>
+            `;
+            container.appendChild(itemDiv);
+        });
+        
+        if (scheduleItems.length === 0) {
+            container.innerHTML = '<p class="empty-message">Henüz ders eklenmemiş. Yukarıdaki butona tıklayarak ders ekleyin.</p>';
+        }
+    }
+
+    document.getElementById('scheduleForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            name: document.getElementById('scheduleName').value,
+            description: document.getElementById('scheduleDescription').value,
+            items: scheduleItems
+        };
+        
+        fetch(`/admin/schedule/${studentId}/update`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('Program başarıyla kaydedildi!');
+                location.reload();
+            } else {
+                alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(err => {
+            console.error('Hata:', err);
+            alert('Program kaydedilirken hata oluştu');
+        });
+    });
+
+    // Modal dışına tıklanınca kapat
+    window.onclick = function(event) {
+        const modal = document.getElementById('scheduleModal');
+        if (event.target == modal) {
+            closeScheduleModal();
+        }
+    }
+</script>
 {% endblock %}
 

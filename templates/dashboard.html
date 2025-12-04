@@ -111,9 +111,14 @@
                             </td>
                             <td>{{ session.notes[:50] if session.notes else '-' }}{{ '...' if session.notes and session.notes|length > 50 else '' }}</td>
                             <td>
-                                <button onclick="deleteStudySession({{ session.id }})" class="btn-delete" title="Sil">
-                                    🗑️
-                                </button>
+                                <div class="action-buttons">
+                                    <button onclick="editStudySession({{ session.id }})" class="btn-edit" title="Düzenle">
+                                        ✏️
+                                    </button>
+                                    <button onclick="deleteStudySession({{ session.id }})" class="btn-delete" title="Sil">
+                                        🗑️
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -169,6 +174,59 @@
                     {% endif %}
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- Çalışma Kaydı Düzenleme Modal -->
+<div id="editStudyModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>✏️ Çalışma Kaydını Düzenle</h2>
+            <span class="close" onclick="closeEditModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="editStudyForm" onsubmit="event.preventDefault(); updateStudySession();">
+                <input type="hidden" id="editSessionId">
+                
+                <div class="form-group">
+                    <label for="editDate">Tarih *</label>
+                    <input type="date" id="editDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="editSubject">Ders/Konu *</label>
+                    <input type="text" id="editSubject" required placeholder="Örn: Matematik, Fizik, Kimya...">
+                </div>
+
+                <div class="form-group">
+                    <label for="editHours">Çalışma Süresi (Saat) *</label>
+                    <input type="number" id="editHours" min="0.1" max="24" step="0.1" required placeholder="Örn: 2.5">
+                </div>
+
+                <div class="form-group">
+                    <label for="editEfficiency">Verimlilik (%) *</label>
+                    <input type="range" id="editEfficiency" min="0" max="100" value="50" oninput="updateEditEfficiencyValue(this.value)" required>
+                    <div class="range-display">
+                        <span id="editEfficiencyValue">50</span>%
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="editNotes">Notlar (Opsiyonel)</label>
+                    <textarea id="editNotes" rows="4" placeholder="Çalıştığınız konular, önemli noktalar..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="editDifficulties">Anlamadığınız Yerler (Opsiyonel)</label>
+                    <textarea id="editDifficulties" rows="3" placeholder="Anlamadığınız veya zorlandığınız konular..."></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Güncelle</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">İptal</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -338,6 +396,89 @@
             console.error('Hesaplama hatası:', error);
             resultDiv.innerHTML = `<div class="alert alert-error">Bir hata oluştu: ${error.message}</div>`;
         });
+    }
+
+    // Çalışma kaydı düzenle
+    function editStudySession(id) {
+        // Kayıt bilgilerini getir
+        fetch('/get-study/' + id)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const study = data.data;
+                    // Modal'ı doldur
+                    document.getElementById('editSessionId').value = study.id;
+                    document.getElementById('editDate').value = study.date;
+                    document.getElementById('editSubject').value = study.subject;
+                    document.getElementById('editHours').value = study.hours;
+                    document.getElementById('editEfficiency').value = study.efficiency;
+                    document.getElementById('editEfficiencyValue').textContent = study.efficiency;
+                    document.getElementById('editNotes').value = study.notes || '';
+                    document.getElementById('editDifficulties').value = study.difficulties || '';
+                    
+                    // Modal'ı göster
+                    document.getElementById('editStudyModal').style.display = 'flex';
+                } else {
+                    alert('Kayıt bilgileri alınamadı: ' + (data.error || 'Bilinmeyen hata'));
+                }
+            })
+            .catch(error => {
+                console.error('Hata:', error);
+                alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+            });
+    }
+
+    // Güncelleme formunu gönder
+    function updateStudySession() {
+        const id = document.getElementById('editSessionId').value;
+        const formData = {
+            date: document.getElementById('editDate').value,
+            subject: document.getElementById('editSubject').value,
+            hours: parseFloat(document.getElementById('editHours').value),
+            efficiency: parseInt(document.getElementById('editEfficiency').value),
+            notes: document.getElementById('editNotes').value,
+            difficulties: document.getElementById('editDifficulties').value
+        };
+
+        fetch('/update-study/' + id, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Çalışma kaydı başarıyla güncellendi!');
+                document.getElementById('editStudyModal').style.display = 'none';
+                location.reload();
+            } else {
+                alert('Güncelleme başarısız: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(error => {
+            console.error('Güncelleme hatası:', error);
+            alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+        });
+    }
+
+    // Modal'ı kapat
+    function closeEditModal() {
+        document.getElementById('editStudyModal').style.display = 'none';
+    }
+
+    // Verimlilik değerini güncelle
+    function updateEditEfficiencyValue(value) {
+        document.getElementById('editEfficiencyValue').textContent = value;
+    }
+
+    // Modal dışına tıklanınca kapat
+    window.onclick = function(event) {
+        const modal = document.getElementById('editStudyModal');
+        if (event.target == modal) {
+            closeEditModal();
+        }
     }
 
     // Çalışma kaydı sil
