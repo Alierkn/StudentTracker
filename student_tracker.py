@@ -54,14 +54,43 @@ def get_google_oauth():
 # Veritabanını başlat (Gunicorn için)
 # Gunicorn ile çalışırken if __name__ == '__main__' çalışmaz
 # Bu yüzden app oluşturulurken init_db() çağrılmalı
+# ÖNEMLİ: init_db() sadece tabloları oluşturur, mevcut verilere dokunmaz
 try:
     print("🔄 Veritabanı başlatılıyor...")
+    # init_db() sadece CREATE TABLE IF NOT EXISTS yapar, veri silmez
+    # ÖNEMLİ: Bu fonksiyon mevcut verilere dokunmaz, sadece tabloları oluşturur
     init_db()
     print("✅ Veritabanı hazır.")
     if USE_SUPABASE:
-        print("📁 Veritabanı: Supabase PostgreSQL")
+        print("📁 Veritabanı: Supabase PostgreSQL ✅")
+        # Supabase bağlantısını ve veri durumunu kontrol et
+        try:
+            with get_db() as conn:
+                from psycopg2.extras import RealDictCursor
+                c = conn.cursor(cursor_factory=RealDictCursor)
+                c.execute('SELECT COUNT(*) as count FROM students')
+                result = c.fetchone()
+                if result:
+                    if isinstance(result, dict):
+                        student_count = result.get('count', 0)
+                    else:
+                        student_count = result[0] if len(result) > 0 else 0
+                    print(f"📊 Mevcut öğrenci sayısı: {student_count}")
+                    if student_count == 0:
+                        print("⚠️  UYARI: Veritabanında öğrenci bulunamadı!")
+        except Exception as check_error:
+            print(f"⚠️  Veri kontrolü hatası: {check_error}")
     else:
-        print("📁 Veritabanı: SQLite (Local)")
+        print("📁 Veritabanı: SQLite (Local) ⚠️")
+        # Production ortamında SQLite kullanımı uyarısı
+        if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER'):
+            print("=" * 60)
+            print("🚨 KRİTİK UYARI: Production'da SQLite kullanılıyor!")
+            print("=" * 60)
+            print("❌ Bu durumda her deploy'da veriler kaybolacak!")
+            print("✅ Railway/Render Dashboard → Variables sekmesine gidin")
+            print("✅ SUPABASE_URL, SUPABASE_KEY, SUPABASE_DB_URL ekleyin")
+            print("=" * 60)
 except Exception as e:
     print(f"⚠️  Veritabanı başlatma uyarısı: {e}")
     import traceback

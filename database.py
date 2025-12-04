@@ -7,11 +7,25 @@ import os
 from contextlib import contextmanager
 
 # Supabase bağlantı bilgileri
-SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
-SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
-SUPABASE_DB_URL = os.environ.get('SUPABASE_DB_URL', '')  # PostgreSQL connection string
+SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip()
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '').strip()
+SUPABASE_DB_URL = os.environ.get('SUPABASE_DB_URL', '').strip()  # PostgreSQL connection string
 
 USE_SUPABASE = bool(SUPABASE_URL and SUPABASE_KEY and SUPABASE_DB_URL)
+
+# Production'da Supabase zorunludur - uyarı ver
+if not USE_SUPABASE and os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER'):
+    print("=" * 60)
+    print("⚠️  UYARI: Production ortamında Supabase bağlantısı yok!")
+    print("=" * 60)
+    print("❌ SUPABASE_URL:", "✅ Var" if SUPABASE_URL else "❌ YOK")
+    print("❌ SUPABASE_KEY:", "✅ Var" if SUPABASE_KEY else "❌ YOK")
+    print("❌ SUPABASE_DB_URL:", "✅ Var" if SUPABASE_DB_URL else "❌ YOK")
+    print("=" * 60)
+    print("⚠️  Production'da SQLite kullanılıyor - VERİLER KAYBOLACAK!")
+    print("📋 Railway/Render Dashboard → Variables sekmesine gidin")
+    print("📋 SUPABASE_URL, SUPABASE_KEY, SUPABASE_DB_URL ekleyin")
+    print("=" * 60)
 
 # Connection pool (PostgreSQL için)
 _pool = None
@@ -77,8 +91,48 @@ def get_placeholder():
     """Placeholder karakterini döndür"""
     return '%s' if USE_SUPABASE else '?'
 
+# init_db() çağrı sayacı - sadece bir kez çalışmasını sağlamak için
+_init_db_called = False
+
 def init_db():
-    """Veritabanı tablolarını oluştur"""
+    """
+    Veritabanı tablolarını oluştur - SADECE TABLO OLUŞTURUR, VERİ SİLMEZ
+    
+    ÖNEMLİ GÜVENLİK NOTLARI:
+    - Bu fonksiyon sadece CREATE TABLE IF NOT EXISTS kullanır
+    - Mevcut tablolar ve veriler KORUNUR
+    - Hiçbir DELETE, DROP, TRUNCATE işlemi yapılmaz
+    - Sadece tablo yoksa oluşturur, varsa dokunmaz
+    """
+    global _init_db_called
+    
+    # Eğer daha önce çağrıldıysa ve tablolar varsa tekrar çalıştırma
+    # (Production'da gereksiz çağrıları önlemek için)
+    if _init_db_called:
+        try:
+            with get_db() as conn:
+                # Tabloların var olup olmadığını kontrol et
+                if USE_SUPABASE:
+                    from psycopg2.extras import RealDictCursor
+                    c = conn.cursor(cursor_factory=RealDictCursor)
+                    c.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'students')")
+                else:
+                    c = conn.cursor()
+                    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='students'")
+                result = c.fetchone()
+                if result:
+                    # Tablo varsa, init_db'yi tekrar çalıştırmaya gerek yok
+                    if USE_SUPABASE:
+                        table_exists = result[0] if isinstance(result, dict) else result[0]
+                    else:
+                        table_exists = result is not None
+                    if table_exists:
+                        return  # Tablolar zaten var, tekrar çalıştırmaya gerek yok
+        except:
+            pass  # Hata olursa devam et, init_db'yi çalıştır
+    
+    _init_db_called = True
+    
     if USE_SUPABASE:
         # PostgreSQL (Supabase)
         with get_db() as conn:
