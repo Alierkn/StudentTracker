@@ -1,0 +1,54 @@
+# Docker ignore file
+# Bu dosyalar Docker build'e dahil edilmez
+
+# Virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+backups/
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
+
+# Flask
+instance/
+.webassets-cache
+
+# Supabase
+.supabase/
+
+# Git
+.git/
+.gitignore
+
+# Test files
+test_*.py
+*_test.py
+

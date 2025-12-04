@@ -1,0 +1,54 @@
+# Railway build ignore file
+# Bu dosyalar build'e dahil edilmez
+
+# Virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+backups/
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
+
+# Flask
+instance/
+.webassets-cache
+
+# Supabase
+.supabase/
+
+# Test files
+test_*.py
+*_test.py
+
+# Documentation (optional - uncomment if you want to exclude)
+# *.md
+# !README.md
+
