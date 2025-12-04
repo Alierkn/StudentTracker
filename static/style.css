@@ -2474,6 +2474,11 @@ body {
 @media (max-width: 768px) {
     .leaderboard-header h1 {
         font-size: 2rem;
+        color: #ffffff !important;
+    }
+    
+    .leaderboard-header .subtitle {
+        color: #ffffff !important;
     }
     
     .leaderboard-item {
